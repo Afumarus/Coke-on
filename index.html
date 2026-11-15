@@ -588,9 +588,14 @@
                         <i class="fa-regular fa-copy"></i>コピー
                     </button>
                 </div>
-                <p id="sync-connection-detail" class="text-[11px] text-emerald-600 font-bold pt-1">
-                    <i class="fa-solid fa-circle-check mr-1"></i>クラウドとリアルタイム接続中
-                </p>
+                <div class="flex items-center justify-center gap-2 pt-1">
+                    <p id="sync-connection-detail" class="text-[11px] text-emerald-600 font-bold">
+                        <i class="fa-solid fa-circle-check mr-1"></i>クラウドとリアルタイム接続中
+                    </p>
+                    <button type="button" id="retry-sync-btn" onclick="retryCloudSync()" class="hidden text-[10px] font-extrabold bg-amber-100 hover:bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full transition">
+                        再接続
+                    </button>
+                </div>
             </div>
 
             <div class="space-y-2.5">
@@ -603,6 +608,31 @@
                         class="flex-1 rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-black uppercase tracking-wider text-slate-800 focus:outline-none focus:border-coke-red">
                     <button type="button" onclick="connectWithSyncCode()" class="bg-coke-red hover:bg-red-700 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap">
                         コードで接続
+                    </button>
+                </div>
+            </div>
+
+            <!-- オフライン/ローカル環境向け：直接データ引き継ぎ -->
+            <div class="bg-amber-50/70 p-3.5 rounded-2xl border border-amber-200/80 space-y-2">
+                <p class="text-[11px] font-extrabold text-amber-900 flex items-center gap-1.5">
+                    <i class="fa-solid fa-share-nodes text-amber-600"></i>
+                    ローカル環境・手動データ引き継ぎ（Backup / Restore）
+                </p>
+                <p class="text-[10px] text-amber-800/80 leading-relaxed">
+                    ローカルモード表示になる場合は、下の「全データをコピー」を押してAirDropやLINE等で別端末へ送り、「貼り付けて復元」で即座に同期できます。
+                </p>
+                <div class="flex gap-2">
+                    <button type="button" onclick="exportBackupText()" class="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-amber-100/60 border border-amber-200 text-amber-900 font-extrabold text-[11px] transition flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-file-export"></i>全データをコピー
+                    </button>
+                    <button type="button" onclick="toggleRestoreBox()" class="flex-1 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[11px] transition flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-file-import"></i>貼り付けて復元
+                    </button>
+                </div>
+                <div id="restore-box" class="hidden pt-1.5 space-y-1.5">
+                    <textarea id="restore-text-input" rows="2" placeholder="コピーした引き継ぎデータをここに貼り付け..." class="w-full rounded-xl border border-amber-200 p-2 text-[11px] font-mono bg-white focus:outline-none focus:border-coke-red"></textarea>
+                    <button type="button" onclick="importBackupText()" class="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-extrabold text-xs transition">
+                        このデータを取り込んで上書き
                     </button>
                 </div>
             </div>
@@ -741,31 +771,137 @@
         }
 
         // Firebase Cloud Firestore 接続＆リアルタイム購読
-        async function initCloudSync() {
+        async function initCloudSync(retryCount = 0) {
             updateSyncIndicator('connecting');
             try {
-                if (typeof __firebase_config === 'undefined') {
-                    updateSyncIndicator('offline');
+                if (typeof __firebase_config === 'undefined' || !__firebase_config) {
+                    if (retryCount < 3) {
+                        setTimeout(() => initCloudSync(retryCount + 1), 800);
+                        return;
+                    }
+                    updateSyncIndicator('offline', 'ローカルファイル環境のため端末内保存で動作中');
                     return;
                 }
-                const firebaseConfig = JSON.parse(__firebase_config);
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
+                const firebaseConfig = typeof __firebase_config === 'string'
+                    ? JSON.parse(__firebase_config)
+                    : __firebase_config;
 
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    const cred = await signInWithCustomToken(auth, __initial_auth_token);
-                    currentUser = cred.user;
-                } else {
-                    const cred = await signInAnonymously(auth);
-                    currentUser = cred.user;
+                if (!db) {
+                    const app = initializeApp(firebaseConfig);
+                    db = getFirestore(app);
+                    auth = getAuth(app);
+                }
+
+                if (!currentUser) {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        try {
+                            const cred = await signInWithCustomToken(auth, __initial_auth_token);
+                            currentUser = cred.user;
+                        } catch (tokenErr) {
+                            const anonCred = await signInAnonymously(auth);
+                            currentUser = anonCred.user;
+                        }
+                    } else {
+                        const cred = await signInAnonymously(auth);
+                        currentUser = cred.user;
+                    }
                 }
 
                 isCloudReady = true;
                 subscribeToSyncRoom(syncCode, false);
             } catch (err) {
                 console.error('Cloud sync init error:', err);
-                updateSyncIndicator('offline');
+                updateSyncIndicator('offline', 'クラウド接続待機中（オフライン）');
+            }
+        }
+
+        async function retryCloudSync() {
+            showToast('クラウドへ再接続しています...', 'info');
+            await initCloudSync(0);
+        }
+        function updateSyncIndicator(status, reasonText = '') {
+            const icon = document.getElementById('sync-status-icon');
+            const label = document.getElementById('sync-status-label');
+            const detail = document.getElementById('sync-connection-detail');
+            const retryBtn = document.getElementById('retry-sync-btn');
+            if (!icon || !label) return;
+
+            if (status === 'connected') {
+                icon.className = 'fa-solid fa-cloud text-xs text-emerald-300';
+                label.textContent = syncCode;
+                if (retryBtn) retryBtn.classList.add('hidden');
+                if (detail) {
+                    detail.className = 'text-[11px] text-emerald-600 font-bold';
+                    detail.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i>クラウドとリアルタイム同期中 (${syncCode})`;
+                }
+            } else if (status === 'connecting') {
+                icon.className = 'fa-solid fa-rotate fa-spin text-xs text-amber-300';
+                label.textContent = '接続中';
+                if (retryBtn) retryBtn.classList.add('hidden');
+                if (detail) {
+                    detail.className = 'text-[11px] text-amber-600 font-bold';
+                    detail.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i>クラウドへ接続しています...`;
+                }
+            } else {
+                icon.className = 'fa-solid fa-cloud-slash text-xs text-white/70';
+                label.textContent = 'ローカル';
+                if (retryBtn) retryBtn.classList.remove('hidden');
+                if (detail) {
+                    detail.className = 'text-[11px] text-amber-700 font-bold';
+                    detail.innerHTML = `<i class="fa-solid fa-mobile-screen mr-1"></i>${reasonText || 'ローカル保存モード'}`;
+                }
+            }
+        }
+
+        // --- 手動データ引き継ぎ（Backup / Restore） ---
+        function exportBackupText() {
+            try {
+                const payload = JSON.stringify({ syncCode, state });
+                const encoded = 'COKEPASS:' + btoa(unescape(encodeURIComponent(payload)));
+                const tempInput = document.createElement('textarea');
+                tempInput.value = encoded;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempInput);
+                showToast('全引き継ぎデータをコピーしました！別端末で貼り付けてください', 'success');
+            } catch (e) {
+                showToast('データのコピーに失敗しました', 'warning');
+            }
+        }
+
+        function toggleRestoreBox() {
+            const box = document.getElementById('restore-box');
+            if (box) box.classList.toggle('hidden');
+        }
+
+        function importBackupText() {
+            const raw = (document.getElementById('restore-text-input').value || '').trim();
+            if (!raw.startsWith('COKEPASS:')) {
+                showToast('正しい引き継ぎデータ（COKEPASS:...）を貼り付けてください', 'warning');
+                return;
+            }
+            try {
+                const base64Part = raw.slice('COKEPASS:'.length);
+                const jsonStr = decodeURIComponent(escape(atob(base64Part)));
+                const parsed = JSON.parse(jsonStr);
+                if (parsed && parsed.state) {
+                    applyParsedState(parsed.state);
+                    if (parsed.syncCode) {
+                        syncCode = parsed.syncCode;
+                        try { localStorage.setItem(SYNC_CODE_STORAGE_KEY, syncCode); } catch (e) {}
+                        document.getElementById('display-sync-code').textContent = syncCode;
+                    }
+                    saveState();
+                    renderQuickPresets();
+                    updateUI();
+                    document.getElementById('restore-text-input').value = '';
+                    document.getElementById('restore-box').classList.add('hidden');
+                    closeSyncModal();
+                    showToast('別端末のデータを復元・同期しました！', 'success');
+                }
+            } catch (e) {
+                showToast('データの読み込みに失敗しました。文字が途切れていないか確認してください', 'warning');
             }
         }
 
@@ -1874,6 +2010,10 @@
             copySyncCode,
             connectWithSyncCode,
             generateNewSyncRoom,
+            retryCloudSync,
+            exportBackupText,
+            toggleRestoreBox,
+            importBackupText,
             openSettingsModal,
             closeSettingsModal,
             selectPlanPreset,
