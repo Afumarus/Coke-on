@@ -941,6 +941,255 @@
             saveState();
             updateUI();
         }
+
+        // --- 日付ユーティリティ ---
+        function getTodayStr() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+
+        function getMonthKey(year, month) {
+            return `${year}-${String(month).padStart(2, '0')}`;
+        }
+
+        function getCurrentMonthLogs() {
+            const key = getMonthKey(viewYear, viewMonth);
+            return state.logsByMonth[key] || [];
+        }
+
+        function getCurrentMonthOffset() {
+            const key = getMonthKey(viewYear, viewMonth);
+            return (state.offsetsByMonth && state.offsetsByMonth[key]) || 0;
+        }
+
+        // --- 日付またぎ＆月替わり自動検知 ---
+        function setupAutoMonthRollover() {
+            setInterval(() => {
+                const currentTodayStr = getTodayStr();
+                if (currentTodayStr !== lastCheckedDateStr) {
+                    const prevMonthPrefix = lastCheckedDateStr.slice(0, 7);
+                    const newMonthPrefix = currentTodayStr.slice(0, 7);
+                    lastCheckedDateStr = currentTodayStr;
+
+                    if (prevMonthPrefix !== newMonthPrefix) {
+                        const d = new Date();
+                        viewYear = d.getFullYear();
+                        viewMonth = d.getMonth() + 1;
+                        showToast(`${viewMonth}月になったため自動的に切り替えました！`, 'info');
+                    }
+                    updateUI();
+                }
+            }, 30000);
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    const currentTodayStr = getTodayStr();
+                    if (currentTodayStr !== lastCheckedDateStr) {
+                        const prevMonthPrefix = lastCheckedDateStr.slice(0, 7);
+                        const newMonthPrefix = currentTodayStr.slice(0, 7);
+                        lastCheckedDateStr = currentTodayStr;
+                        if (prevMonthPrefix !== newMonthPrefix) {
+                            const d = new Date();
+                            viewYear = d.getFullYear();
+                            viewMonth = d.getMonth() + 1;
+                            showToast(`${viewMonth}月になったため自動的に切り替えました！`, 'info');
+                        }
+                        updateUI();
+                    }
+                }
+            });
+        }
+
+        // --- クイックドリンクプリセット描画 ---
+        function renderQuickPresets() {
+            const container = document.getElementById('quick-drink-presets');
+            if (!container) return;
+            container.innerHTML = '';
+
+            QUICK_PRESETS.forEach((preset, idx) => {
+                const isSelected = idx === state.selectedPresetIndex;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.onclick = () => {
+                    state.selectedPresetIndex = idx;
+                    saveLocalCacheOnly();
+                    renderQuickPresets();
+                    updateSelectedPresetBadge();
+                };
+                btn.className = isSelected
+                    ? 'flex-shrink-0 px-3 py-1.5 rounded-xl bg-coke-red text-white text-xs font-extrabold shadow-xs transition flex items-center gap-1'
+                    : 'flex-shrink-0 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center gap-1';
+                btn.innerHTML = `<span>${preset.icon}</span><span>${preset.label}</span><span class="opacity-80">¥${preset.price}</span>`;
+                container.appendChild(btn);
+            });
+            updateSelectedPresetBadge();
+        }
+
+        function updateSelectedPresetBadge() {
+            const preset = QUICK_PRESETS[state.selectedPresetIndex] || QUICK_PRESETS[0];
+            const badge = document.getElementById('selected-preset-badge');
+            if (badge) badge.textContent = `¥${preset.price}`;
+        }
+
+        // --- メインUI全体更新 ---
+        function updateUI() {
+            const realNow = new Date();
+            const realYear = realNow.getFullYear();
+            const realMonth = realNow.getMonth() + 1;
+            const todayStr = getTodayStr();
+            const isCurrentRealMonth = (viewYear === realYear && viewMonth === realMonth);
+
+            // ヘッダー表示
+            document.getElementById('current-plan-badge').textContent =
+                `${state.plan.name} (月${state.plan.monthlyLimit}本 / 日${state.plan.dailyLimit}本)`;
+            document.getElementById('display-month').textContent = `${viewYear}年 ${viewMonth}月`;
+
+            const jumpBtn = document.getElementById(' jump-today-btn') || document.getElementById('jump-today-btn');
+            if (jumpBtn) {
+                if (isCurrentRealMonth) {
+                    jumpBtn.classList.add('hidden');
+                } else {
+                    jumpBtn.classList.remove('hidden');
+                }
+            }
+
+            // 1. 残り交換数とゲージ計算
+            const logs = getCurrentMonthLogs();
+            const initialOffset = getCurrentMonthOffset();
+            const usedCount = logs.length + initialOffset;
+            const monthlyLimit = state.plan.monthlyLimit;
+            const remainingCount = Math.max(0, monthlyLimit - usedCount);
+
+            document.getElementById('remaining-count').textContent = remainingCount;
+            document.getElementById('used-ratio-label').textContent = initialOffset > 0
+                ? `交換済: ${usedCount}/${monthlyLimit} (補正${initialOffset}含む)`
+                : `交換済: ${usedCount} / ${monthlyLimit}`;
+
+            const circumference = 314.16;
+            const ratio = Math.min(1, remainingCount / Math.max(1, monthlyLimit));
+            const offsetDash = circumference * (1 - ratio);
+            const progressCircle = document.getElementById('progress-circle');
+            if (progressCircle) {
+                progressCircle.style.strokeDashoffset = offsetDash;
+            }
+
+            // 2. 本日の残り枠
+            const todayLogs = logs.filter(l => l.date === todayStr);
+            const dailyLimit = state.plan.dailyLimit;
+            const todayRemaining = Math.max(0, Math.min(remainingCount, dailyLimit - todayLogs.length));
+
+            document.getElementById('today-remaining-num').textContent = todayRemaining;
+            document.getElementById('daily-limit-num').textContent = dailyLimit;
+
+            const statusBadge = document.getElementById('today-status-badge');
+            if (remainingCount <= 0) {
+                statusBadge.textContent = '今月上限達成';
+                statusBadge.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600';
+            } else if (todayRemaining <= 0) {
+                statusBadge.textContent = '本日上限済';
+                statusBadge.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700';
+            } else {
+                statusBadge.textContent = '交換OK';
+                statusBadge.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700';
+            }
+
+            const bottlesContainer = document.getElementById('today-bottles-icons');
+            bottlesContainer.innerHTML = '';
+            for (let i = 0; i < dailyLimit; i++) {
+                const icon = document.createElement('i');
+                if (i < todayLogs.length) {
+                    icon.className = 'fa-solid fa-bottle-water text-coke-red';
+                } else {
+                    icon.className = 'fa-solid fa-bottle-water text-slate-200';
+                }
+                bottlesContainer.appendChild(icon);
+            }
+
+            // 3. 今月残り日数＆ペースアドバイス
+            const daysInMonth = new Date(viewYear, viewMonth, 0).getDate();
+            let daysLeft = daysInMonth;
+            if (isCurrentRealMonth) {
+                daysLeft = Math.max(1, daysInMonth - realNow.getDate() + 1);
+            } else if (viewYear < realYear || (viewYear === realYear && viewMonth < realMonth)) {
+                daysLeft = 0;
+            }
+
+            document.getElementById('days-left-label').textContent = daysLeft > 0 ? `あと ${daysLeft} 日` : '終了した月';
+            const paceEl = document.getElementById('pace-advice');
+            if (remainingCount <= 0) {
+                paceEl.textContent = '🎉 今月の上限本数をすべて使い切りました！';
+            } else if (daysLeft <= 0) {
+                paceEl.textContent = `この月は ${remainingCount} 本残して終了しました。`;
+            } else {
+                const perDay = (remainingCount / daysLeft).toFixed(1);
+                if (remainingCount > daysLeft * dailyLimit) {
+                    paceEl.textContent = `毎日上限(${dailyLimit}本)まで交換して追い上げましょう！`;
+                } else {
+                    paceEl.textContent = `1日あたり約 ${perDay} 本ペースでぴったり使い切れます！`;
+                }
+            }
+
+            // 4. メインボタン＆戻すボタン状態
+            const mainBtn = document.getElementById('main-exchange-btn');
+            const undoBtn = document.getElementById('undo-btn');
+            mainBtn.disabled = isCurrentRealMonth ? (todayRemaining <= 0 || remainingCount <= 0) : (remainingCount <= 0);
+            undoBtn.disabled = logs.length === 0;
+
+            // 5. おトク度・元取れメーター計算
+            const planCost = state.plan.price;
+            const defaultDrinkPrice = state.plan.defaultDrinkPrice || 180;
+            const logsTotalValue = logs.reduce((sum, item) => sum + (Number(item.price) || defaultDrinkPrice), 0);
+            const offsetTotalValue = initialOffset * defaultDrinkPrice;
+            const totalValue = logsTotalValue + offsetTotalValue;
+            const diffValue = totalValue - planCost;
+
+            document.getElementById('stat-plan-cost').textContent = `¥${planCost.toLocaleString()}`;
+            document.getElementById('stat-total-value').textContent = `¥${totalValue.toLocaleString()}`;
+
+            const diffEl = document.getElementById('stat-diff-value');
+            if (diffValue >= 0) {
+                diffEl.textContent = `+¥${diffValue.toLocaleString()}`;
+                diffEl.className = 'text-sm font-black text-emerald-600 mt-0.5';
+            } else {
+                diffEl.textContent = `-¥${Math.abs(diffValue).toLocaleString()}`;
+                diffEl.className = 'text-sm font-black text-slate-500 mt-0.5';
+            }
+
+            const roiPercent = planCost > 0 ? Math.min(100, Math.round((totalValue / planCost) * 100)) : 100;
+            document.getElementById('roi-percent').textContent = `${planCost > 0 ? Math.round((totalValue / planCost) * 100) : 100}%`;
+            document.getElementById('roi-bar').style.width = `${roiPercent}%`;
+
+            const roiBadge = document.getElementById('roi-badge');
+            const breakevenText = document.getElementById('breakeven-text');
+            if (diffValue >= 0) {
+                roiBadge.textContent = '✨ 元取れ達成！';
+                roiBadge.className = 'text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700';
+                breakevenText.textContent = `すでに ¥${diffValue.toLocaleString()} 分おトクになっています！`;
+            } else {
+                const neededBottles = Math.ceil(Math.abs(diffValue) / Math.max(1, defaultDrinkPrice));
+                roiBadge.textContent = `あと${neededBottles}本で元取れ`;
+                roiBadge.className = 'text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700';
+                breakevenText.textContent = `元を取るまであと ${neededBottles}本 (¥${defaultDrinkPrice}換算)`;
+            }
+
+            document.getElementById('cost-per-bottle').textContent = usedCount > 0
+                ? `現在の実質1本単価: 約${Math.round(planCost / usedCount)}円`
+                : '現在の実質1本単価: - 円';
+            document.getElementById('max-cost-per-bottle').textContent =
+                `上限消化時: 約${Math.round(planCost / Math.max(1, monthlyLimit))}円/本`;
+
+            // 6. 自動更新リマインダーカウントダウン
+            const renewalEl = document.getElementById('renewal-countdown');
+            if (renewalEl) {
+                if (isCurrentRealMonth) {
+                    const lastDayDate = new Date(realYear, realMonth, 0);
+                    const diffDays = Math.max(0, lastDayDate.getDate() - realNow.getDate());
+                    renewalEl.textContent = diffDays === 0 ? '本日14:59締切' : `月末まであと${diffDays}日`;
+                } else {
+                    renewalEl.textContent = `${viewMonth}月末日14:59締切`;
+                }
+            }
+
             // 7. カレンダーと履歴の描画
             document.getElementById('history-count-pill').textContent = usedCount;
             renderCalendar(logs);
@@ -1097,6 +1346,214 @@
                 cell.appendChild(dots);
 
                 grid.appendChild(cell);
+            }
+        }
+
+        // --- 履歴リスト描画 ---
+        function renderHistoryList(logs) {
+            const container = document.getElementById('history-list');
+            if (!container) return;
+            const initialOffset = getCurrentMonthOffset();
+
+            if (logs.length === 0 && initialOffset === 0) {
+                container.innerHTML = `<div class="text-center py-8 text-xs text-slate-400 font-semibold">まだこの月の交換記録はありません</div>`;
+                return;
+            }
+
+            container.innerHTML = '';
+
+            // 新しい順に並び替えて表示
+            const sortedLogs = [...logs].reverse();
+            sortedLogs.forEach((item) => {
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between bg-slate-50 p-3 rounded-2xl border border-slate-100';
+                row.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-red-100 text-coke-red flex items-center justify-center font-bold text-sm">
+                            <i class="fa-solid fa-bottle-water"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-extrabold text-slate-800">${escapeHtml(item.name)}</p>
+                            <p class="text-[10px] font-semibold text-slate-400">${item.date} ${item.time || ''}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2.5">
+                        <span class="text-xs font-black text-slate-700">¥${item.price}</span>
+                        <button type="button" onclick="deleteLogById('${item.id}')" class="w-7 h-7 rounded-lg bg-white hover:bg-red-50 text-slate-400 hover:text-coke-red border border-slate-200/70 flex items-center justify-center transition" title="削除">
+                            <i class="fa-regular fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+
+            if (initialOffset > 0) {
+                const offsetRow = document.createElement('div');
+                offsetRow.className = 'flex items-center justify-between bg-amber-50/70 p-3 rounded-2xl border border-amber-200/70';
+                offsetRow.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center font-bold text-sm">
+                            <i class="fa-solid fa-sliders"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-extrabold text-amber-900">途中開始・初期補正分</p>
+                            <p class="text-[10px] font-semibold text-amber-700/80">アプリ導入前の交換済み本数</p>
+                        </div>
+                    </div>
+                    <span class="text-xs font-black text-amber-900">${initialOffset} 本</span>
+                `;
+                container.appendChild(offsetRow);
+            }
+        }
+
+        // --- 交換アクション（ワンタップ記録・戻す・個別削除） ---
+        function recordQuickExchange() {
+            const todayStr = getTodayStr();
+            const d = new Date();
+            const targetKey = getMonthKey(d.getFullYear(), d.getMonth() + 1);
+
+            if (!state.logsByMonth[targetKey]) {
+                state.logsByMonth[targetKey] = [];
+            }
+
+            const monthLogs = state.logsByMonth[targetKey];
+            const monthOffset = (state.offsetsByMonth && state.offsetsByMonth[targetKey]) || 0;
+            if (monthLogs.length + monthOffset >= state.plan.monthlyLimit) {
+                showToast('今月の交換上限に達しています！', 'warning');
+                return;
+            }
+
+            const todayLogs = monthLogs.filter(l => l.date === todayStr);
+            if (todayLogs.length >= state.plan.dailyLimit) {
+                showToast(`本日の上限（${state.plan.dailyLimit}本）に達しています`, 'warning');
+                return;
+            }
+
+            const preset = QUICK_PRESETS[state.selectedPresetIndex] || QUICK_PRESETS[0];
+            const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+            monthLogs.push({
+                id: 'log_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+                date: todayStr,
+                time: timeStr,
+                name: preset.label,
+                price: preset.price
+            });
+
+            viewYear = d.getFullYear();
+            viewMonth = d.getMonth() + 1;
+
+            saveState();
+            updateUI();
+            showToast(`${preset.icon} ${preset.label} (¥${preset.price}) を記録しました！`, 'success');
+        }
+
+        function undoLastExchange() {
+            const key = getMonthKey(viewYear, viewMonth);
+            const logs = state.logsByMonth[key];
+            if (!logs || logs.length === 0) return;
+
+            const removed = logs.pop();
+            saveState();
+            updateUI();
+            showToast(`「${removed.name}」の記録を取り消しました`, 'info');
+        }
+
+        function deleteLogById(logId) {
+            for (const mKey of Object.keys(state.logsByMonth)) {
+                const arr = state.logsByMonth[mKey];
+                const idx = arr.findIndex(item => item.id === logId);
+                if (idx !== -1) {
+                    arr.splice(idx, 1);
+                    saveState();
+                    updateUI();
+                    renderModalDayLogs();
+                    showToast('記録を1件削除しました', 'info');
+                    return;
+                }
+            }
+        }
+
+        // --- タブ＆月移動 ---
+        function switchView(tab) {
+            currentTab = tab;
+            const tabCal = document.getElementById('tab-calendar');
+            const tabHist = document.getElementById('tab-history');
+            const viewCal = document.getElementById('view-calendar');
+            const viewHist = document.getElementById('view-history');
+            const calControls = document.getElementById('calendar-controls');
+
+            if (tab === 'calendar') {
+                tabCal.className = 'px-3 py-1.5 rounded-lg text-xs font-extrabold transition bg-white text-slate-800 shadow-sm';
+                tabHist.className = 'px-3 py-1.5 rounded-lg text-xs font-extrabold transition text-slate-500 hover:text-slate-800';
+                viewCal.classList.remove('hidden');
+                viewHist.classList.add('hidden');
+                if (calControls) calControls.classList.remove('hidden');
+            } else {
+                tabHist.className = 'px-3 py-1.5 rounded-lg text-xs font-extrabold transition bg-white text-slate-800 shadow-sm';
+                tabCal.className = 'px-3 py-1.5 rounded-lg text-xs font-extrabold transition text-slate-500 hover:text-slate-800';
+                viewHist.classList.remove('hidden');
+                viewCal.classList.add('hidden');
+                if (calControls) calControls.classList.add('hidden');
+            }
+        }
+
+        function changeMonth(delta) {
+            viewMonth += delta;
+            if (viewMonth > 12) {
+                viewMonth = 1;
+                viewYear++;
+            } else if (viewMonth < 1) {
+                viewMonth = 12;
+                viewYear--;
+            }
+            updateUI();
+        }
+
+        function jumpToCurrentMonth() {
+            const d = new Date();
+            viewYear = d.getFullYear();
+            viewMonth = d.getMonth() + 1;
+            updateUI();
+        }
+
+        // --- 設定・途中開始補正モーダル制御 ---
+        function openSettingsModal(focusMidMonth = false) {
+            highlightPlanPresetButton(state.plan.type || 'max');
+            document.getElementById('input-monthly-limit').value = state.plan.monthlyLimit;
+            document.getElementById('input-daily-limit').value = state.plan.dailyLimit;
+            document.getElementById('input-plan-price').value = state.plan.price;
+            document.getElementById('input-default-drink-price').value = state.plan.defaultDrinkPrice || 180;
+
+            const currentOffset = getCurrentMonthOffset();
+            const logsCount = getCurrentMonthLogs().length;
+            document.getElementById('input-initial-offset').value = currentOffset;
+            document.getElementById('input-current-remaining').value = Math.max(0, state.plan.monthlyLimit - logsCount - currentOffset);
+
+            const monthBadge = document.getElementById('adjust-month-badge');
+            if (monthBadge) monthBadge.textContent = `${viewYear}年${viewMonth}月分`;
+
+            const helperText = document.getElementById('offset-helper-text');
+            if (helperText) {
+                helperText.textContent = `※「現在の残り交換数」にCoke ONアプリの数字を入れると自動逆算されます（アプリ内記録: ${logsCount}本）`;
+            }
+
+            const prorateInput = document.getElementById('input-prorate-start-date');
+            if (prorateInput) {
+                const todayStr = getTodayStr();
+                const currentMonthKey = getMonthKey(viewYear, viewMonth);
+                prorateInput.value = todayStr.startsWith(currentMonthKey) ? todayStr : `${currentMonthKey}-01`;
+            }
+
+            const modal = document.getElementById('settings-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            if (focusMidMonth) {
+                setTimeout(() => {
+                    const box = document.getElementById('midmonth-adjustment-box');
+                    if (box) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 80);
             }
         }
 
