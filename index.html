@@ -720,7 +720,11 @@
                 ? `交換済: ${usedCount}/${monthlyLimit} (補正+${initialOffset})`
                 : `交換済: ${usedCount} / ${monthlyLimit}本`;
             const ratio = monthlyLimit > 0 ? Math.min(1, remainingCount / monthlyLimit) : 0;
+            const circle = document.getElementById('progress-circle');
+            const radius = circle.r.baseVal.value;
+            const circumference = 2 * Math.PI * radius;
             const offset = circumference - (ratio * circumference);
+            circle.style.strokeDasharray = `${circumference} ${circumference}`;
             circle.style.strokeDashoffset = offset;
 
             // 3. 今日の残り枠ステータス
@@ -805,6 +809,8 @@
             } else {
                 daysLeftLabel.textContent = `${daysInMonth}日間`;
                 paceAdvice.textContent = `${viewYear}年${viewMonth}月の記録アーカイブ（全${usedCount}本交換）`;
+            }
+
             // 5. おトク度・損益分岐トラッカー更新（途中開始補正分も基準価格で換算）
             const loggedValue = logs.reduce((sum, item) => sum + (Number(item.price) || defaultDrinkPrice), 0);
             const offsetValue = initialOffset * (defaultDrinkPrice || 180);
@@ -1188,21 +1194,6 @@
             updateUI();
             closeSettingsModal();
             showToast('プラン・補正設定を保存しました！', 'success');
-        }
-
-            state.plan = {
-                type: state.plan.type,
-                name: planName,
-                monthlyLimit,
-                dailyLimit,
-                price: planPrice,
-                defaultDrinkPrice
-            };
-
-            saveState();
-            updateUI();
-            closeSettingsModal();
-            showToast('プラン設定を保存しました！', 'success');
         }
 
         // --- 日付指定・カスタム記録モーダル制御 ---
