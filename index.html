@@ -646,11 +646,7 @@
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
+    <script>
         // --- 状態管理とキー ---
         const SYNC_CODE_STORAGE_KEY = 'coke_on_pass_sync_code_v1';
         const CACHE_STORAGE_KEY = 'coke_on_pass_tracker_cache_v1';
@@ -683,7 +679,8 @@
             }
         };
 
-        // Firebase 初期化変数
+        // Firebase 動的モジュール＆状態変数
+        let fbOps = null;
         let db = null;
         let auth = null;
         let currentUser = null;
@@ -720,9 +717,9 @@
             return newCode;
         }
 
-        // --- 初期化 ---
+        // --- 初期化（UIを最優先で即時起動し、クラウドは非同期で後から接続） ---
         let isInitialized = false;
-        async function initApp() {
+        function initApp() {
             if (isInitialized) return;
             isInitialized = true;
 
@@ -731,7 +728,7 @@
             renderQuickPresets();
             updateUI();
             setupAutoMonthRollover();
-            await initCloudSync();
+            initCloudSync();
         }
 
         if (document.readyState === 'loading') {
@@ -770,55 +767,66 @@
             };
         }
 
-        // Firebase Cloud Firestore 接続＆リアルタイム購読
+        // Firebase Cloud Firestore 接続＆リアルタイム購読（動的インポートでUIブロックを防止）
         async function initCloudSync(retryCount = 0) {
             updateSyncIndicator('connecting');
             try {
                 if (typeof __firebase_config === 'undefined' || !__firebase_config) {
-                    if (retryCount < 3) {
+                    if (retryCount < 2) {
                         setTimeout(() => initCloudSync(retryCount + 1), 800);
                         return;
                     }
-                    updateSyncIndicator('offline', 'ローカルファイル環境のため端末内保存で動作中');
+                    updateSyncIndicator('offline', '端末内保存モード（下の「全データをコピー」で端末間共有可能）');
                     return;
                 }
+
+                if (!fbOps) {
+                    const [appMod, authMod, fsMod] = await Promise.all([
+                        import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js"),
+                        import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"),
+                        import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js")
+                    ]);
+                    fbOps = { ...appMod, ...authMod, ...fsMod };
+                }
+
                 const firebaseConfig = typeof __firebase_config === 'string'
                     ? JSON.parse(__firebase_config)
                     : __firebase_config;
 
                 if (!db) {
-                    const app = initializeApp(firebaseConfig);
-                    db = getFirestore(app);
-                    auth = getAuth(app);
+                    const app = fbOps.initializeApp(firebaseConfig);
+                    db = fbOps.getFirestore(app);
+                    auth = fbOps.getAuth(app);
                 }
 
                 if (!currentUser) {
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                         try {
-                            const cred = await signInWithCustomToken(auth, __initial_auth_token);
+                            const cred = await fbOps.signInWithCustomToken(auth, __initial_auth_token);
                             currentUser = cred.user;
                         } catch (tokenErr) {
-                            const anonCred = await signInAnonymously(auth);
+                            const anonCred = await fbOps.signInAnonymously(auth);
                             currentUser = anonCred.user;
                         }
                     } else {
-                        const cred = await signInAnonymously(auth);
+                        const cred = await fbOps.signInAnonymously(auth);
                         currentUser = cred.user;
                     }
                 }
 
                 isCloudReady = true;
-                subscribeToSyncRoom(syncCode, false);
+                await subscribeToSyncRoom(syncCode, false);
             } catch (err) {
                 console.error('Cloud sync init error:', err);
-                updateSyncIndicator('offline', 'クラウド接続待機中（オフライン）');
+                updateSyncIndicator('offline', '端末内保存モード（下の「全データをコピー」で端末間共有可能）');
             }
         }
 
         async function retryCloudSync() {
-            showToast('クラウドへ再接続しています...', 'info');
+            showToast('クラウド接続を確認しています...', 'info');
             await initCloudSync(0);
         }
+
         function updateSyncIndicator(status, reasonText = '') {
             const icon = document.getElementById('sync-status-icon');
             const label = document.getElementById('sync-status-label');
@@ -907,7 +915,7 @@
 
         // 指定の同期コードのドキュメントをリアルタイム監視
         async function subscribeToSyncRoom(code, isJoiningExisting = false) {
-            if (!db || !currentUser) return;
+            if (!db || !currentUser || !fbOps) return;
             if (unsubscribeSnapshot) {
                 unsubscribeSnapshot();
                 unsubscribeSnapshot = null;
@@ -918,18 +926,16 @@
             const displayEl = document.getElementById('display-sync-code');
             if (displayEl) displayEl.textContent = syncCode;
 
-            const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'coke_pass_rooms', syncCode);
+            const roomDocRef = fbOps.doc(db, 'artifacts', appId, 'public', 'data', 'coke_pass_rooms', syncCode);
 
             try {
-                const snap = await getDoc(roomDocRef);
+                const snap = await fbOps.getDoc(roomDocRef);
                 if (!snap.exists()) {
-                    // まだクラウドにデータがない場合は現在の端末データをアップロード
-                    await setDoc(roomDocRef, {
+                    await fbOps.setDoc(roomDocRef, {
                         stateJson: JSON.stringify(state),
                         updatedAt: Date.now()
                     });
                 } else if (isJoiningExisting) {
-                    // 別端末のコードに参加した場合はクラウド側の最新データを即座に反映
                     const data = snap.data();
                     if (data && data.stateJson) {
                         applyParsedState(JSON.parse(data.stateJson));
@@ -942,7 +948,7 @@
                 console.error('Initial room check error:', e);
             }
 
-            unsubscribeSnapshot = onSnapshot(roomDocRef, (docSnap) => {
+            unsubscribeSnapshot = fbOps.onSnapshot(roomDocRef, (docSnap) => {
                 updateSyncIndicator('connected');
                 if (docSnap.exists()) {
                     const data = docSnap.data();
@@ -960,38 +966,8 @@
                 }
             }, (error) => {
                 console.error('Snapshot listener error:', error);
-                updateSyncIndicator('offline');
+                updateSyncIndicator('offline', 'クラウド接続エラー（ローカル保存で動作中）');
             });
-        }
-
-        function updateSyncIndicator(status) {
-            const icon = document.getElementById('sync-status-icon');
-            const label = document.getElementById('sync-status-label');
-            const detail = document.getElementById('sync-connection-detail');
-            if (!icon || !label) return;
-
-            if (status === 'connected') {
-                icon.className = 'fa-solid fa-cloud text-xs text-emerald-300';
-                label.textContent = syncCode;
-                if (detail) {
-                    detail.className = 'text-[11px] text-emerald-600 font-bold pt-1';
-                    detail.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i>クラウドとリアルタイム同期中 (${syncCode})`;
-                }
-            } else if (status === 'connecting') {
-                icon.className = 'fa-solid fa-rotate fa-spin text-xs text-amber-300';
-                label.textContent = '接続中';
-                if (detail) {
-                    detail.className = 'text-[11px] text-amber-600 font-bold pt-1';
-                    detail.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i>クラウドへ接続しています...`;
-                }
-            } else {
-                icon.className = 'fa-solid fa-cloud-slash text-xs text-white/60';
-                label.textContent = 'ローカル';
-                if (detail) {
-                    detail.className = 'text-[11px] text-slate-500 font-bold pt-1';
-                    detail.innerHTML = `<i class="fa-solid fa-mobile-screen mr-1"></i>端末内保存モード`;
-                }
-            }
         }
 
         function saveLocalCacheOnly() {
@@ -1003,10 +979,10 @@
         // 状態保存（ローカルキャッシュ＋クラウド即時同期）
         async function saveState() {
             saveLocalCacheOnly();
-            if (isCloudReady && db && currentUser && syncCode) {
+            if (isCloudReady && db && currentUser && syncCode && fbOps) {
                 try {
-                    const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'coke_pass_rooms', syncCode);
-                    await setDoc(roomDocRef, {
+                    const roomDocRef = fbOps.doc(db, 'artifacts', appId, 'public', 'data', 'coke_pass_rooms', syncCode);
+                    await fbOps.setDoc(roomDocRef, {
                         stateJson: JSON.stringify(state),
                         updatedAt: Date.now()
                     });
