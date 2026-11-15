@@ -163,6 +163,9 @@
                             <span class="text-xs font-bold text-slate-500">本</span>
                         </div>
                         <span id="used-ratio-label" class="text-[10px] font-semibold text-slate-400 mt-0.5">交換済: 0 / 31</span>
+                        <button onclick="openSettingsModal(true)" class="mt-1 text-[10px] font-bold text-coke-red bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded-full transition flex items-center gap-0.5">
+                            <i class="fa-solid fa-sliders text-[9px]"></i>途中開始・補正
+                        </button>
                     </div>
                 </div>
 
@@ -394,7 +397,7 @@
                 <div class="grid grid-cols-3 gap-2.5">
                     <div>
                         <label class="text-[11px] font-bold text-slate-600 block mb-1">月間上限(本)</label>
-                        <input type="number" id="input-monthly-limit" min="1" max="100" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-800 focus:outline-none focus:border-coke-red" value="31">
+                        <input type="number" id="input-monthly-limit" min="1" max="100" oninput="syncRemainingPreview()" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-800 focus:outline-none focus:border-coke-red" value="31">
                     </div>
                     <div>
                         <label class="text-[11px] font-bold text-slate-600 block mb-1">1日上限(本)</label>
@@ -404,6 +407,51 @@
                         <label class="text-[11px] font-bold text-slate-600 block mb-1">月額料金(円)</label>
                         <input type="number" id="input-plan-price" min="0" step="10" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-800 focus:outline-none focus:border-coke-red" value="3300">
                     </div>
+                </div>
+            </div>
+
+            <!-- 月の途中から始める場合の補正セクション -->
+            <div id="midmonth-adjustment-box" class="bg-amber-50/70 p-4 rounded-2xl space-y-3 border border-amber-200/80">
+                <div class="flex items-center justify-between">
+                    <p class="text-xs font-extrabold text-amber-900 flex items-center gap-1.5">
+                        <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i>
+                        月の途中から始める・本数補正
+                    </p>
+                    <span id="adjust-month-badge" class="text-[10px] font-bold bg-amber-200/70 text-amber-900 px-2 py-0.5 rounded-full">2026年11月分</span>
+                </div>
+
+                <!-- 1. 契約開始日からの日割り自動計算（新規契約向け） -->
+                <div class="bg-white/80 p-3 rounded-xl border border-amber-100 space-y-2">
+                    <label class="text-[11px] font-bold text-slate-600 block">
+                        パターンA：月の途中で新規契約した場合（日割り自動計算）
+                    </label>
+                    <div class="flex items-center gap-2">
+                        <input type="date" id="input-prorate-start-date" class="flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-coke-red">
+                        <button type="button" onclick="applyProratedCalculation()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold px-3 py-1.5 rounded-lg shadow-xs transition whitespace-nowrap">
+                            日割り反映
+                        </button>
+                    </div>
+                    <p class="text-[10px] text-slate-400">※契約開始日から月末までの残り日数割合で上限本数・料金を自動計算します</p>
+                </div>
+
+                <!-- 2. すでに使った本数 / 現在の残り本数から直接補正（継続利用向け） -->
+                <div class="bg-white/80 p-3 rounded-xl border border-amber-100 space-y-2">
+                    <label class="text-[11px] font-bold text-slate-600 block">
+                        パターンB：今月すでに何本か交換済みの場合（直接補正）
+                    </label>
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <div>
+                            <span class="text-[10px] font-bold text-slate-500 block mb-0.5">アプリ導入前の交換済(本)</span>
+                            <input type="number" id="input-initial-offset" min="0" max="100" value="0" oninput="onOffsetInput()" class="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm font-black text-slate-800 focus:outline-none focus:border-coke-red">
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-bold text-coke-red block mb-0.5">現在の残り交換数(本)</span>
+                            <input type="number" id="input-current-remaining" min="0" max="100" value="31" oninput="onRemainingInput()" class="w-full rounded-lg border border-red-200 bg-red-50/30 px-2.5 py-1.5 text-sm font-black text-coke-red focus:outline-none focus:border-coke-red">
+                        </div>
+                    </div>
+                    <p id="offset-helper-text" class="text-[10px] text-slate-500 font-medium">
+                        ※「現在の残り交換数」にCoke ONアプリの数字を入れると自動逆算されます（アプリ内記録: 0本）
+                    </p>
                 </div>
             </div>
 
@@ -522,7 +570,9 @@
             },
             selectedPresetIndex: 0,
             // logsByMonth: { "YYYY-MM": [ { id, date: "YYYY-MM-DD", time: "HH:MM", name, price } ] }
-            logsByMonth: {}
+            logsByMonth: {},
+            // offsetsByMonth: { "YYYY-MM": number } 月の途中開始時の初期消費済み本数補正
+            offsetsByMonth: {}
         };
 
         // 現在表示中の年月
@@ -581,41 +631,26 @@
             return state.logsByMonth[key];
         }
 
-        // --- クイックプリセット描画 ---
-        function renderQuickPresets() {
-            const container = document.getElementById('quick-drink-presets');
-            container.innerHTML = '';
+        // 表示中の月の初期消費済み補正本数を取得
+        function getCurrentMonthOffset() {
+            const key = getMonthKey(viewYear, viewMonth);
+            if (!state.offsetsByMonth) state.offsetsByMonth = {};
+            return Math.max(0, parseInt(state.offsetsByMonth[key], 10) || 0);
+        }
 
-            QUICK_PRESETS.forEach((preset, idx) => {
-                const isSelected = idx === state.selectedPresetIndex;
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.onclick = () => {
-                    state.selectedPresetIndex = idx;
-                    saveState();
-                    renderQuickPresets();
-                    document.getElementById('selected-preset-badge').textContent = `¥${preset.price}`;
-                };
-                btn.className = `flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1 border ${
-                    isSelected 
-                        ? 'bg-red-50 border-coke-red text-coke-red shadow-xs' 
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                }`;
-                btn.innerHTML = `<span>${preset.icon}</span><span>${preset.label}</span><span class="opacity-75">¥${preset.price}</span>`;
-                container.appendChild(btn);
-            });
-
-            const currentPreset = QUICK_PRESETS[state.selectedPresetIndex] || QUICK_PRESETS[0];
-            document.getElementById('selected-preset-badge').textContent = `¥${currentPreset.price}`;
+        // 表示中の月の合計消費本数（アプリ内記録 + 途中開始補正分）
+        function getTotalUsedCount() {
+            return getCurrentMonthLogs().length + getCurrentMonthOffset();
         }
 
         // --- ワンタップ交換記録 ---
         function recordQuickExchange() {
             const logs = getCurrentMonthLogs();
+            const totalUsed = getTotalUsedCount();
             const monthlyLimit = state.plan.monthlyLimit;
             const dailyLimit = state.plan.dailyLimit;
 
-            if (logs.length >= monthlyLimit) {
+            if (totalUsed >= monthlyLimit) {
                 showToast('今月の交換上限に達しています！', 'warning');
                 return;
             }
@@ -646,7 +681,7 @@
             saveState();
             updateUI();
 
-            const remaining = Math.max(0, monthlyLimit - logs.length);
+            const remaining = Math.max(0, monthlyLimit - getTotalUsedCount());
             showToast(`${preset.icon} 1本交換を記録！（今月残り${remaining}本）`, 'success');
         }
 
@@ -663,6 +698,7 @@
         // --- UI全体更新 ---
         function updateUI() {
             const logs = getCurrentMonthLogs();
+            const initialOffset = getCurrentMonthOffset();
             const { monthlyLimit, dailyLimit, price: planPrice, name: planName, defaultDrinkPrice } = state.plan;
 
             // 1. ヘッダー＆プラン名表示
@@ -676,14 +712,13 @@
                 jumpBtn.classList.toggle('hidden', isCurrentMonth);
             }
 
-            // 2. 残り交換数と円形プログレス
-            const usedCount = logs.length;
+            // 2. 残り交換数と円形プログレス（アプリ記録＋途中開始補正を考慮）
+            const usedCount = logs.length + initialOffset;
             const remainingCount = Math.max(0, monthlyLimit - usedCount);
             document.getElementById('remaining-count').textContent = remainingCount;
-            document.getElementById('used-ratio-label').textContent = `交換済: ${usedCount} / ${monthlyLimit}本`;
-
-            const circle = document.getElementById('progress-circle');
-            const circumference = 2 * Math.PI * 50; // r=50 -> 314.16
+            document.getElementById('used-ratio-label').textContent = initialOffset > 0
+                ? `交換済: ${usedCount}/${monthlyLimit} (補正+${initialOffset})`
+                : `交換済: ${usedCount} / ${monthlyLimit}本`;
             const ratio = monthlyLimit > 0 ? Math.min(1, remainingCount / monthlyLimit) : 0;
             const offset = circumference - (ratio * circumference);
             circle.style.strokeDashoffset = offset;
@@ -770,10 +805,10 @@
             } else {
                 daysLeftLabel.textContent = `${daysInMonth}日間`;
                 paceAdvice.textContent = `${viewYear}年${viewMonth}月の記録アーカイブ（全${usedCount}本交換）`;
-            }
-
-            // 5. おトク度・損益分岐トラッカー更新
-            const totalValue = logs.reduce((sum, item) => sum + (Number(item.price) || defaultDrinkPrice), 0);
+            // 5. おトク度・損益分岐トラッカー更新（途中開始補正分も基準価格で換算）
+            const loggedValue = logs.reduce((sum, item) => sum + (Number(item.price) || defaultDrinkPrice), 0);
+            const offsetValue = initialOffset * (defaultDrinkPrice || 180);
+            const totalValue = loggedValue + offsetValue;
             const diff = totalValue - planPrice;
             const roiPercent = planPrice > 0 ? Math.min(100, Math.round((totalValue / planPrice) * 100)) : 100;
 
@@ -995,16 +1030,97 @@
         }
 
         // --- 設定モーダル制御 ---
-        function openSettingsModal() {
-            document.getElementById('input-monthly-limit').value = state.plan.monthlyLimit;
+        function openSettingsModal(focusAdjustment = false) {
+            const monthlyLimit = state.plan.monthlyLimit;
+            const logsCount = getCurrentMonthLogs().length;
+            const currentOffset = getCurrentMonthOffset();
+            const currentRemaining = Math.max(0, monthlyLimit - (logsCount + currentOffset));
+
+            document.getElementById('input-monthly-limit').value = monthlyLimit;
             document.getElementById('input-daily-limit').value = state.plan.dailyLimit;
             document.getElementById('input-plan-price').value = state.plan.price;
             document.getElementById('input-default-drink-price').value = state.plan.defaultDrinkPrice || 180;
+
+            // 途中開始補正フィールドの初期化
+            document.getElementById('adjust-month-badge').textContent = `${viewYear}年${viewMonth}月分`;
+            document.getElementById('input-initial-offset').value = currentOffset;
+            document.getElementById('input-current-remaining').value = currentRemaining;
+            document.getElementById('offset-helper-text').textContent =
+                `※「現在の残り交換数」にCoke ONアプリの数字を入れると自動逆算されます（アプリ内記録: ${logsCount}本）`;
+
+            // 日割り開始日の初期値（表示中の月の今日、または1日）
+            const todayStr = getTodayStr();
+            const currentMonthKey = getMonthKey(viewYear, viewMonth);
+            document.getElementById('input-prorate-start-date').value =
+                todayStr.startsWith(currentMonthKey) ? todayStr : `${currentMonthKey}-01`;
+
             highlightPlanPresetButton(state.plan.type);
 
             const modal = document.getElementById('settings-modal');
             modal.classList.remove('hidden');
             modal.classList.add('flex');
+
+            if (focusAdjustment) {
+                setTimeout(() => {
+                    const box = document.getElementById('midmonth-adjustment-box');
+                    if (box) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+            }
+        }
+
+        // 月間上限変更時に残り本数プレビューを同期
+        function syncRemainingPreview() {
+            const limit = Math.max(1, parseInt(document.getElementById('input-monthly-limit').value, 10) || 1);
+            const offset = Math.max(0, parseInt(document.getElementById('input-initial-offset').value, 10) || 0);
+            const logsCount = getCurrentMonthLogs().length;
+            document.getElementById('input-current-remaining').value = Math.max(0, limit - logsCount - offset);
+        }
+
+        // 「アプリ導入前の交換済(本)」入力時に「現在の残り交換数」を連動更新
+        function onOffsetInput() {
+            const limit = Math.max(1, parseInt(document.getElementById('input-monthly-limit').value, 10) || 1);
+            const offset = Math.max(0, parseInt(document.getElementById('input-initial-offset').value, 10) || 0);
+            const logsCount = getCurrentMonthLogs().length;
+            document.getElementById('input-current-remaining').value = Math.max(0, limit - logsCount - offset);
+        }
+
+        // 「現在の残り交換数」入力時に「アプリ導入前の交換済(本)」を逆算
+        function onRemainingInput() {
+            const limit = Math.max(1, parseInt(document.getElementById('input-monthly-limit').value, 10) || 1);
+            const remaining = Math.max(0, parseInt(document.getElementById('input-current-remaining').value, 10) || 0);
+            const logsCount = getCurrentMonthLogs().length;
+            const calculatedOffset = Math.max(0, limit - logsCount - remaining);
+            document.getElementById('input-initial-offset').value = calculatedOffset;
+        }
+
+        // 契約開始日からの日割り上限本数・料金の自動計算
+        function applyProratedCalculation() {
+            const startDateVal = document.getElementById('input-prorate-start-date').value;
+            if (!startDateVal) return;
+
+            const [y, m, d] = startDateVal.split('-').map(Number);
+            const daysInTargetMonth = new Date(y, m, 0).getDate();
+            const remainingDays = Math.max(1, daysInTargetMonth - d + 1);
+            const ratio = remainingDays / daysInTargetMonth;
+
+            // 選択中プランのフル基準値を取得
+            const baseLimit = state.plan.type === 'plan20' ? 20 : 31;
+            const basePrice = state.plan.type === 'plan20' ? 2320 : 3300;
+
+            const proratedLimit = Math.max(1, Math.round(baseLimit * ratio));
+            const proratedPrice = Math.round((basePrice * ratio) / 10) * 10;
+
+            state.plan.type = 'custom';
+            highlightPlanPresetButton('custom');
+
+            document.getElementById('input-monthly-limit').value = proratedLimit;
+            document.getElementById('input-plan-price').value = proratedPrice;
+            document.getElementById('input-initial-offset').value = 0;
+
+            const logsCount = getCurrentMonthLogs().length;
+            document.getElementById('input-current-remaining').value = Math.max(0, proratedLimit - logsCount);
+
+            showToast(`${m}月${d}日開始（残り${remainingDays}日間）で日割り計算しました`, 'info');
         }
 
         function closeSettingsModal() {
@@ -1026,6 +1142,7 @@
                 document.getElementById('input-daily-limit').value = 1;
                 document.getElementById('input-plan-price').value = 2320;
             }
+            syncRemainingPreview();
         }
 
         function highlightPlanPresetButton(type) {
@@ -1046,6 +1163,7 @@
             const dailyLimit = Math.max(1, parseInt(document.getElementById('input-daily-limit').value, 10) || 2);
             const planPrice = Math.max(0, parseInt(document.getElementById('input-plan-price').value, 10) || 0);
             const defaultDrinkPrice = Math.max(50, parseInt(document.getElementById('input-default-drink-price').value, 10) || 180);
+            const initialOffset = Math.max(0, parseInt(document.getElementById('input-initial-offset').value, 10) || 0);
 
             let planName = 'カスタムプラン';
             if (state.plan.type === 'max' && monthlyLimit === 31 && dailyLimit === 2) {
@@ -1053,6 +1171,24 @@
             } else if (state.plan.type === 'plan20' && monthlyLimit === 20 && dailyLimit === 1) {
                 planName = 'おトクプラン20';
             }
+
+            state.plan = {
+                type: state.plan.type,
+                name: planName,
+                monthlyLimit,
+                dailyLimit,
+                price: planPrice,
+                defaultDrinkPrice
+            };
+
+            if (!state.offsetsByMonth) state.offsetsByMonth = {};
+            state.offsetsByMonth[getMonthKey(viewYear, viewMonth)] = initialOffset;
+
+            saveState();
+            updateUI();
+            closeSettingsModal();
+            showToast('プラン・補正設定を保存しました！', 'success');
+        }
 
             state.plan = {
                 type: state.plan.type,
@@ -1108,7 +1244,8 @@
             }
 
             const monthLogs = state.logsByMonth[targetMonthKey];
-            if (monthLogs.length >= state.plan.monthlyLimit) {
+            const monthOffset = (state.offsetsByMonth && state.offsetsByMonth[targetMonthKey]) || 0;
+            if (monthLogs.length + monthOffset >= state.plan.monthlyLimit) {
                 showToast('この月の交換上限に達しています', 'warning');
                 return;
             }
@@ -1193,10 +1330,13 @@
         function executeResetMonth() {
             const key = getMonthKey(viewYear, viewMonth);
             state.logsByMonth[key] = [];
+            if (state.offsetsByMonth) {
+                state.offsetsByMonth[key] = 0;
+            }
             saveState();
             updateUI();
             closeConfirmModal();
-            showToast(`${viewYear}年${viewMonth}月の記録をリセットしました`, 'info');
+            showToast(`${viewYear}年${viewMonth}月の記録と補正をリセットしました`, 'info');
         }
 
         // --- トースト通知表示 ---
