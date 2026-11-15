@@ -124,9 +124,9 @@
                 </div>
                 <div class="flex items-center gap-1.5">
                     <button type="button" onclick="openSyncModal()" id="sync-status-btn"
-                       class="h-9 px-2.5 rounded-full bg-white/15 hover:bg-white/25 flex items-center gap-1.5 transition text-white text-xs font-bold" title="Mac・iPhone端末間同期">
-                        <i id="sync-status-icon" class="fa-solid fa-cloud text-xs text-emerald-300"></i>
-                        <span id="sync-status-label" class="hidden sm:inline">同期中</span>
+                       class="h-9 px-2.5 rounded-full bg-white/15 hover:bg-white/25 flex items-center gap-1.5 transition text-white text-xs font-bold" title="Mac・iPhoneデータ共有・同期">
+                        <i id="sync-status-icon" class="fa-solid fa-share-nodes text-xs text-amber-300"></i>
+                        <span id="sync-status-label">端末間共有</span>
                     </button>
                     <a href="https://c.cocacola.co.jp/app/pass/" target="_blank" rel="noopener noreferrer" 
                        class="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition text-white" title="Coke ON Pass 公式サイト">
@@ -580,68 +580,68 @@
                 </button>
             </div>
 
-            <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2 text-center">
-                <span class="text-[11px] font-bold text-slate-500 block">現在の同期コード（この端末のID）</span>
-                <div class="flex items-center justify-center gap-2">
-                    <code id="display-sync-code" class="text-xl font-black tracking-widest text-coke-red bg-white px-4 py-2 rounded-xl border border-red-100 select-all">COKE-0000</code>
-                    <button type="button" onclick="copySyncCode()" class="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition flex items-center gap-1">
-                        <i class="fa-regular fa-copy"></i>コピー
-                    </button>
-                </div>
-                <div class="flex items-center justify-center gap-2 pt-1">
-                    <p id="sync-connection-detail" class="text-[11px] text-emerald-600 font-bold">
-                        <i class="fa-solid fa-circle-check mr-1"></i>クラウドとリアルタイム接続中
+    <!-- モーダル4: Mac・iPhone 端末間データ共有・同期モーダル -->
+    <div id="sync-modal" onclick="if(event.target===this) closeSyncModal()" class="fixed inset-0 z-[105] bg-black/50 backdrop-blur-xs hidden items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto animate-fadeIn">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="font-black text-base text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-share-nodes text-coke-red"></i>Mac ⇔ iPhone データ共有・同期
+                </h3>
+                <button onclick="closeSyncModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- 1. ワンタップ共有（AirDrop / メッセージ / コピー） -->
+            <div class="bg-red-50/70 p-4 rounded-2xl border border-red-100 space-y-3">
+                <div>
+                    <span class="text-xs font-black text-coke-red flex items-center gap-1.5">
+                        <i class="fa-solid fa-paper-plane"></i>ステップ1：この端末のデータを別端末へ送る
+                    </span>
+                    <p class="text-[11px] text-slate-600 mt-1 leading-relaxed">
+                        下のボタンを押して <strong>AirDrop や LINE・メモ</strong> でMacやiPhoneへ送ってください。受け取った側でリンクを開くだけでデータが同期されます！
                     </p>
-                    <button type="button" id="retry-sync-btn" onclick="retryCloudSync()" class="hidden text-[10px] font-extrabold bg-amber-100 hover:bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full transition">
-                        再接続
+                </div>
+                <div class="grid grid-cols-1 gap-2">
+                    <button type="button" onclick="shareSyncLink()" class="w-full py-3 px-4 rounded-xl bg-coke-red hover:bg-red-700 text-white font-black text-sm shadow-sm transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-arrow-up-from-bracket"></i>AirDrop / アプリで同期リンクを送る
+                    </button>
+                    <button type="button" onclick="copySyncUrl()" class="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-slate-50 border border-red-200 text-coke-red font-extrabold text-xs transition flex items-center justify-center gap-1.5">
+                        <i class="fa-regular fa-link"></i>同期用URLをクリップボードにコピー
                     </button>
                 </div>
             </div>
 
-            <div class="space-y-2.5">
-                <label class="text-xs font-bold text-slate-700 block">別の端末（MacまたはiPhone）とデータを合わせる</label>
-                <p class="text-[11px] text-slate-500 leading-relaxed">
-                    もう一方の端末に表示されている「同期コード」を入力して接続すると、両方の端末で残り本数や交換履歴がリアルタイムに自動共有されます。
-                </p>
-                <div class="flex gap-2">
-                    <input type="text" id="input-sync-code" placeholder="例: COKE-1234" maxlength="20"
-                        class="flex-1 rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-black uppercase tracking-wider text-slate-800 focus:outline-none focus:border-coke-red">
-                    <button type="button" onclick="connectWithSyncCode()" class="bg-coke-red hover:bg-red-700 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap">
-                        コードで接続
-                    </button>
+            <!-- 2. テキストでの手動引き継ぎ（ローカルHTMLファイル用） -->
+            <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-2.5">
+                <div>
+                    <span class="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                        <i class="fa-solid fa-paste text-slate-500"></i>ステップ2：データを取り込む（貼り付け復元）
+                    </span>
+                    <p class="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                        HTMLファイルを直接開いている場合など、URLで開けないときは「全データをコピー」した文字列をここに貼り付けて復元できます。
+                    </p>
                 </div>
-            </div>
-
-            <!-- オフライン/ローカル環境向け：直接データ引き継ぎ -->
-            <div class="bg-amber-50/70 p-3.5 rounded-2xl border border-amber-200/80 space-y-2">
-                <p class="text-[11px] font-extrabold text-amber-900 flex items-center gap-1.5">
-                    <i class="fa-solid fa-share-nodes text-amber-600"></i>
-                    ローカル環境・手動データ引き継ぎ（Backup / Restore）
-                </p>
-                <p class="text-[10px] text-amber-800/80 leading-relaxed">
-                    ローカルモード表示になる場合は、下の「全データをコピー」を押してAirDropやLINE等で別端末へ送り、「貼り付けて復元」で即座に同期できます。
-                </p>
                 <div class="flex gap-2">
-                    <button type="button" onclick="exportBackupText()" class="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-amber-100/60 border border-amber-200 text-amber-900 font-extrabold text-[11px] transition flex items-center justify-center gap-1">
-                        <i class="fa-solid fa-file-export"></i>全データをコピー
+                    <button type="button" onclick="exportBackupText()" class="flex-1 py-2 px-3 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-extrabold text-[11px] transition flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-file-export"></i>引き継ぎ文字をコピー
                     </button>
-                    <button type="button" onclick="toggleRestoreBox()" class="flex-1 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-[11px] transition flex items-center justify-center gap-1">
+                    <button type="button" onclick="toggleRestoreBox()" class="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-extrabold text-[11px] transition flex items-center justify-center gap-1">
                         <i class="fa-solid fa-file-import"></i>貼り付けて復元
                     </button>
                 </div>
                 <div id="restore-box" class="hidden pt-1.5 space-y-1.5">
-                    <textarea id="restore-text-input" rows="2" placeholder="コピーした引き継ぎデータをここに貼り付け..." class="w-full rounded-xl border border-amber-200 p-2 text-[11px] font-mono bg-white focus:outline-none focus:border-coke-red"></textarea>
-                    <button type="button" onclick="importBackupText()" class="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-extrabold text-xs transition">
-                        このデータを取り込んで上書き
+                    <textarea id="restore-text-input" rows="2" placeholder="COKEPASS:... または同期URLをここに貼り付け" class="w-full rounded-xl border border-slate-300 p-2 text-[11px] font-mono bg-white focus:outline-none focus:border-coke-red"></textarea>
+                    <button type="button" onclick="importBackupText()" class="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs transition">
+                        このデータを取り込んで同期する
                     </button>
                 </div>
             </div>
 
-            <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-                <span>※個人情報は保存されません</span>
-                <button type="button" onclick="generateNewSyncRoom()" class="text-slate-500 hover:text-coke-red font-bold underline">
-                    新しいコードを発行
-                </button>
+            <!-- クラウド接続ステータス（プレビュー環境時のみ有効） -->
+            <div id="cloud-status-footer" class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                <span id="sync-connection-detail"><i class="fa-solid fa-mobile-screen mr-1"></i>端末内保存（ローカル動作中）</span>
+                <span id="display-sync-code" class="font-mono font-bold text-slate-500">COKE-0000</span>
             </div>
         </div>
     </div>
@@ -705,25 +705,14 @@
                     const normalized = paramCode.trim().toUpperCase();
                     localStorage.setItem(SYNC_CODE_STORAGE_KEY, normalized);
                     return normalized;
-                }
-                const saved = localStorage.getItem(SYNC_CODE_STORAGE_KEY);
-                if (saved && saved.trim().length >= 4) {
-                    return saved.trim().toUpperCase();
-                }
-            } catch (e) {}
-            const randomNum = Math.floor(1000 + Math.random() * 9000);
-            const newCode = `COKE-${randomNum}`;
-            try { localStorage.setItem(SYNC_CODE_STORAGE_KEY, newCode); } catch (e) {}
-            return newCode;
-        }
-
-        // --- 初期化（UIを最優先で即時起動し、クラウドは非同期で後から接続） ---
+        // --- 初期化（UIを最優先で即時起動し、URL同期パラメータがあれば自動取り込み） ---
         let isInitialized = false;
         function initApp() {
             if (isInitialized) return;
             isInitialized = true;
 
             loadLocalCache();
+            checkUrlSyncPayload();
             createFizzBubbles();
             renderQuickPresets();
             updateUI();
@@ -731,52 +720,43 @@
             initCloudSync();
         }
 
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initApp);
-        } else {
-            initApp();
-        }
-        window.addEventListener('load', initApp);
-
-        // ローカルキャッシュから即座に初期読み込み
-        function loadLocalCache() {
+        // URLのハッシュ(#data=...)またはクエリ(?data=...)に同期データが含まれていれば自動復元
+        function checkUrlSyncPayload() {
             try {
-                const raw = localStorage.getItem(CACHE_STORAGE_KEY) || localStorage.getItem('coke_on_pass_tracker_v1');
-                if (raw) {
-                    const parsed = JSON.parse(raw);
-                    if (parsed && typeof parsed === 'object') {
-                        applyParsedState(parsed);
+                let encoded = '';
+                if (window.location.hash && window.location.hash.startsWith('#data=')) {
+                    encoded = decodeURIComponent(window.location.hash.slice('#data='.length));
+                } else {
+                    const params = new URLSearchParams(window.location.search);
+                    if (params.get('data')) {
+                        encoded = params.get('data');
+                    }
+                }
+                if (encoded && encoded.startsWith('COKEPASS:')) {
+                    const base64Part = encoded.slice('COKEPASS:'.length);
+                    const jsonStr = decodeURIComponent(escape(atob(base64Part)));
+                    const parsed = JSON.parse(jsonStr);
+                    if (parsed && parsed.state) {
+                        applyParsedState(parsed.state);
+                        saveLocalCacheOnly();
+                        // URLをクリーンに戻す
+                        if (window.history && window.history.replaceState) {
+                            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+                        }
+                        setTimeout(() => {
+                            showToast('共有リンクからデータを同期しました！', 'success');
+                        }, 300);
                     }
                 }
             } catch (e) {
-                console.error('Failed to load cache:', e);
+                console.error('URL sync import error:', e);
             }
         }
-
-        function applyParsedState(parsed) {
-            state = {
-                ...state,
-                ...parsed,
-                plan: { ...state.plan, ...(parsed.plan || {}) },
-                logsByMonth: parsed.logsByMonth || {},
-                offsetsByMonth: parsed.offsetsByMonth || {},
-                calendarPrefs: {
-                    mode: (parsed.calendarPrefs && parsed.calendarPrefs.mode) || 'month',
-                    weekStart: (parsed.calendarPrefs && parsed.calendarPrefs.weekStart) || 'sun'
-                }
-            };
-        }
-
-        // Firebase Cloud Firestore 接続＆リアルタイム購読（動的インポートでUIブロックを防止）
+        // Firebase Cloud Firestore 接続＆リアルタイム購読（プレビュー環境時のみ自動接続）
         async function initCloudSync(retryCount = 0) {
-            updateSyncIndicator('connecting');
             try {
                 if (typeof __firebase_config === 'undefined' || !__firebase_config) {
-                    if (retryCount < 2) {
-                        setTimeout(() => initCloudSync(retryCount + 1), 800);
-                        return;
-                    }
-                    updateSyncIndicator('offline', '端末内保存モード（下の「全データをコピー」で端末間共有可能）');
+                    updateSyncIndicator('offline', '端末内保存（AirDrop/リンクで共有可能）');
                     return;
                 }
 
@@ -817,62 +797,92 @@
                 isCloudReady = true;
                 await subscribeToSyncRoom(syncCode, false);
             } catch (err) {
-                console.error('Cloud sync init error:', err);
-                updateSyncIndicator('offline', '端末内保存モード（下の「全データをコピー」で端末間共有可能）');
+                updateSyncIndicator('offline', '端末内保存（AirDrop/リンクで共有可能）');
             }
-        }
-
-        async function retryCloudSync() {
-            showToast('クラウド接続を確認しています...', 'info');
-            await initCloudSync(0);
         }
 
         function updateSyncIndicator(status, reasonText = '') {
             const icon = document.getElementById('sync-status-icon');
             const label = document.getElementById('sync-status-label');
             const detail = document.getElementById('sync-connection-detail');
-            const retryBtn = document.getElementById('retry-sync-btn');
             if (!icon || !label) return;
 
             if (status === 'connected') {
                 icon.className = 'fa-solid fa-cloud text-xs text-emerald-300';
-                label.textContent = syncCode;
-                if (retryBtn) retryBtn.classList.add('hidden');
+                label.textContent = '同期中';
                 if (detail) {
                     detail.className = 'text-[11px] text-emerald-600 font-bold';
-                    detail.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i>クラウドとリアルタイム同期中 (${syncCode})`;
-                }
-            } else if (status === 'connecting') {
-                icon.className = 'fa-solid fa-rotate fa-spin text-xs text-amber-300';
-                label.textContent = '接続中';
-                if (retryBtn) retryBtn.classList.add('hidden');
-                if (detail) {
-                    detail.className = 'text-[11px] text-amber-600 font-bold';
-                    detail.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i>クラウドへ接続しています...`;
+                    detail.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i>クラウドリアルタイム同期中`;
                 }
             } else {
-                icon.className = 'fa-solid fa-cloud-slash text-xs text-white/70';
-                label.textContent = 'ローカル';
-                if (retryBtn) retryBtn.classList.remove('hidden');
+                icon.className = 'fa-solid fa-share-nodes text-xs text-amber-300';
+                label.textContent = '端末間共有';
                 if (detail) {
-                    detail.className = 'text-[11px] text-amber-700 font-bold';
-                    detail.innerHTML = `<i class="fa-solid fa-mobile-screen mr-1"></i>${reasonText || 'ローカル保存モード'}`;
+                    detail.className = 'text-[11px] text-slate-500 font-bold';
+                    detail.innerHTML = `<i class="fa-solid fa-mobile-screen mr-1"></i>${reasonText || '端末内保存モード'}`;
                 }
+            }
+        }
+
+        // --- 同期URL生成＆AirDrop/OS標準シェア機能 ---
+        function buildEncodedPayload() {
+            const payload = JSON.stringify({ syncCode, state });
+            return 'COKEPASS:' + btoa(unescape(encodeURIComponent(payload)));
+        }
+
+        function buildSyncUrl() {
+            const encoded = buildEncodedPayload();
+            const baseUrl = window.location.href.split('#')[0];
+            return `${baseUrl}#data=${encodeURIComponent(encoded)}`;
+        }
+
+        async function shareSyncLink() {
+            const syncUrl = buildSyncUrl();
+            if (navigator.share && !window.location.protocol.startsWith('file')) {
+                try {
+                    await navigator.share({
+                        title: 'Coke ON Pass 同期データ',
+                        text: 'Coke ON Passの残り本数・記録データを同期します',
+                        url: syncUrl
+                    });
+                    return;
+                } catch (err) {
+                    if (err && err.name === 'AbortError') return;
+                }
+            }
+            // Web Share非対応またはfile://の場合は引き継ぎテキスト/URLをコピー
+            copySyncUrl();
+        }
+
+        function copySyncUrl() {
+            try {
+                const isLocalFile = window.location.protocol.startsWith('file');
+                const textToCopy = isLocalFile ? buildEncodedPayload() : buildSyncUrl();
+                const tempInput = document.createElement('textarea');
+                tempInput.value = textToCopy;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempInput);
+                showToast(isLocalFile
+                    ? '引き継ぎデータをコピーしました！別端末の「貼り付けて復元」へ入れてください'
+                    : '同期用URLをコピーしました！AirDropやLINE等で別端末へ送ってください', 'success');
+            } catch (e) {
+                showToast('コピーに失敗しました', 'warning');
             }
         }
 
         // --- 手動データ引き継ぎ（Backup / Restore） ---
         function exportBackupText() {
             try {
-                const payload = JSON.stringify({ syncCode, state });
-                const encoded = 'COKEPASS:' + btoa(unescape(encodeURIComponent(payload)));
+                const encoded = buildEncodedPayload();
                 const tempInput = document.createElement('textarea');
                 tempInput.value = encoded;
                 document.body.appendChild(tempInput);
                 tempInput.select();
                 document.execCommand('copy');
                 document.body.removeChild(tempInput);
-                showToast('全引き継ぎデータをコピーしました！別端末で貼り付けてください', 'success');
+                showToast('引き継ぎ文字列をコピーしました！別端末で貼り付けてください', 'success');
             } catch (e) {
                 showToast('データのコピーに失敗しました', 'warning');
             }
@@ -884,9 +894,13 @@
         }
 
         function importBackupText() {
-            const raw = (document.getElementById('restore-text-input').value || '').trim();
+            let raw = (document.getElementById('restore-text-input').value || '').trim();
+            // URLごと貼り付けられた場合にも対応
+            if (raw.includes('#data=')) {
+                raw = decodeURIComponent(raw.split('#data=')[1]);
+            }
             if (!raw.startsWith('COKEPASS:')) {
-                showToast('正しい引き継ぎデータ（COKEPASS:...）を貼り付けてください', 'warning');
+                showToast('正しい引き継ぎデータ（COKEPASS:...）または同期URLを貼り付けてください', 'warning');
                 return;
             }
             try {
@@ -995,7 +1009,6 @@
         // --- 同期モーダル操作 ---
         function openSyncModal() {
             document.getElementById('display-sync-code').textContent = syncCode;
-            document.getElementById('input-sync-code').value = '';
             const modal = document.getElementById('sync-modal');
             modal.classList.remove('hidden');
             modal.classList.add('flex');
@@ -1983,10 +1996,11 @@
         Object.assign(window, {
             openSyncModal,
             closeSyncModal,
+            shareSyncLink,
+            copySyncUrl,
             copySyncCode,
             connectWithSyncCode,
             generateNewSyncRoom,
-            retryCloudSync,
             exportBackupText,
             toggleRestoreBox,
             importBackupText,
