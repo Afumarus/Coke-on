@@ -140,17 +140,17 @@
 
             <!-- 月選択バー -->
             <div class="flex items-center justify-between bg-black/20 backdrop-blur-md rounded-2xl p-1.5 px-3 border border-white/10">
-                <button onclick="changeMonth(-1)" class="w-8 h-8 rounded-xl hover:bg-white/10 flex items-center justify-center transition active:scale-90">
+                <button type="button" onclick="changeMonth(-1)" class="w-8 h-8 rounded-xl hover:bg-white/10 flex items-center justify-center transition active:scale-90">
                     <i class="fa-solid fa-chevron-left text-xs"></i>
                 </button>
                 <div class="flex items-center gap-2">
                     <i class="fa-regular fa-calendar text-xs opacity-80"></i>
                     <span id="display-month" class="font-extrabold text-sm tracking-wide">2026年 11月</span>
-                    <button id=" jump-today-btn" onclick="jumpToCurrentMonth()" class="hidden text-[10px] bg-white text-coke-red font-bold px-2 py-0.5 rounded-full shadow-sm">
+                    <button type="button" id="jump-today-btn" onclick="jumpToCurrentMonth()" class="hidden text-[10px] bg-white text-coke-red font-bold px-2 py-0.5 rounded-full shadow-sm">
                         今月へ
                     </button>
                 </div>
-                <button onclick="changeMonth(1)" class="w-8 h-8 rounded-xl hover:bg-white/10 flex items-center justify-center transition active:scale-90">
+                <button type="button" onclick="changeMonth(1)" class="w-8 h-8 rounded-xl hover:bg-white/10 flex items-center justify-center transition active:scale-90">
                     <i class="fa-solid fa-chevron-right text-xs"></i>
                 </button>
             </div>
@@ -568,18 +568,6 @@
         </div>
     </div>
 
-    <!-- モーダル4: Mac・iPhone 端末間クラウド同期モーダル -->
-    <div id="sync-modal" onclick="if(event.target===this) closeSyncModal()" class="fixed inset-0 z-[105] bg-black/50 backdrop-blur-xs hidden items-center justify-center p-4">
-        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-fadeIn">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 class="font-black text-base text-slate-800 flex items-center gap-2">
-                    <i class="fa-solid fa-cloud-arrow-up text-coke-red"></i>Mac・iPhone 端末間クラウド同期
-                </h3>
-                <button onclick="closeSyncModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-
     <!-- モーダル4: Mac・iPhone 端末間データ共有・同期モーダル -->
     <div id="sync-modal" onclick="if(event.target===this) closeSyncModal()" class="fixed inset-0 z-[105] bg-black/50 backdrop-blur-xs hidden items-center justify-center p-4">
         <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto animate-fadeIn">
@@ -638,17 +626,16 @@
                 </div>
             </div>
 
-            <!-- クラウド接続ステータス（プレビュー環境時のみ有効） -->
+            <!-- ステータスフッター -->
             <div id="cloud-status-footer" class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-                <span id="sync-connection-detail"><i class="fa-solid fa-mobile-screen mr-1"></i>端末内保存（ローカル動作中）</span>
-                <span id="display-sync-code" class="font-mono font-bold text-slate-500">COKE-0000</span>
+                <span id="sync-connection-detail"><i class="fa-solid fa-mobile-screen mr-1"></i>ブラウザ自動保存＋リンク共有対応</span>
+                <span id="display-sync-code" class="font-mono font-bold text-slate-500">Local Sync</span>
             </div>
         </div>
     </div>
 
     <script>
         // --- 状態管理とキー ---
-        const SYNC_CODE_STORAGE_KEY = 'coke_on_pass_sync_code_v1';
         const CACHE_STORAGE_KEY = 'coke_on_pass_tracker_cache_v1';
 
         // クイック選択プリセット
@@ -679,16 +666,6 @@
             }
         };
 
-        // Firebase 動的モジュール＆状態変数
-        let fbOps = null;
-        let db = null;
-        let auth = null;
-        let currentUser = null;
-        let syncCode = getOrCreateSyncCode();
-        let unsubscribeSnapshot = null;
-        let isCloudReady = false;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
         // 現在表示中の年月
         let now = new Date();
         let viewYear = now.getFullYear();
@@ -696,16 +673,40 @@
         let lastCheckedDateStr = getTodayStr();
         let currentTab = 'calendar';
 
-        // 同期コードの取得または新規生成
-        function getOrCreateSyncCode() {
+        function applyParsedState(parsed) {
+            if (!parsed || typeof parsed !== 'object') return;
+            state = {
+                ...state,
+                ...parsed,
+                plan: { ...state.plan, ...(parsed.plan || {}) },
+                logsByMonth: parsed.logsByMonth || {},
+                offsetsByMonth: parsed.offsetsByMonth || {},
+                calendarPrefs: { ...state.calendarPrefs, ...(parsed.calendarPrefs || {}) }
+            };
+        }
+
+        function loadLocalCache() {
             try {
-                const urlParams = new URLSearchParams(window.location.search);
-                const paramCode = urlParams.get('sync');
-                if (paramCode && paramCode.trim().length >= 4) {
-                    const normalized = paramCode.trim().toUpperCase();
-                    localStorage.setItem(SYNC_CODE_STORAGE_KEY, normalized);
-                    return normalized;
-        // --- 初期化（UIを最優先で即時起動し、URL同期パラメータがあれば自動取り込み） ---
+                const raw = localStorage.getItem(CACHE_STORAGE_KEY);
+                if (raw) {
+                    applyParsedState(JSON.parse(raw));
+                }
+            } catch (e) {
+                console.error('Failed to load local cache:', e);
+            }
+        }
+
+        function saveLocalCacheOnly() {
+            try {
+                localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(state));
+            } catch (e) {}
+        }
+
+        function saveState() {
+            saveLocalCacheOnly();
+        }
+
+        // --- 初期化 ---
         let isInitialized = false;
         function initApp() {
             if (isInitialized) return;
@@ -717,7 +718,6 @@
             renderQuickPresets();
             updateUI();
             setupAutoMonthRollover();
-            initCloudSync();
         }
 
         // URLのハッシュ(#data=...)またはクエリ(?data=...)に同期データが含まれていれば自動復元
@@ -739,7 +739,6 @@
                     if (parsed && parsed.state) {
                         applyParsedState(parsed.state);
                         saveLocalCacheOnly();
-                        // URLをクリーンに戻す
                         if (window.history && window.history.replaceState) {
                             window.history.replaceState(null, '', window.location.pathname + window.location.search);
                         }
@@ -752,81 +751,10 @@
                 console.error('URL sync import error:', e);
             }
         }
-        // Firebase Cloud Firestore 接続＆リアルタイム購読（プレビュー環境時のみ自動接続）
-        async function initCloudSync(retryCount = 0) {
-            try {
-                if (typeof __firebase_config === 'undefined' || !__firebase_config) {
-                    updateSyncIndicator('offline', '端末内保存（AirDrop/リンクで共有可能）');
-                    return;
-                }
-
-                if (!fbOps) {
-                    const [appMod, authMod, fsMod] = await Promise.all([
-                        import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js"),
-                        import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"),
-                        import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js")
-                    ]);
-                    fbOps = { ...appMod, ...authMod, ...fsMod };
-                }
-
-                const firebaseConfig = typeof __firebase_config === 'string'
-                    ? JSON.parse(__firebase_config)
-                    : __firebase_config;
-
-                if (!db) {
-                    const app = fbOps.initializeApp(firebaseConfig);
-                    db = fbOps.getFirestore(app);
-                    auth = fbOps.getAuth(app);
-                }
-
-                if (!currentUser) {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        try {
-                            const cred = await fbOps.signInWithCustomToken(auth, __initial_auth_token);
-                            currentUser = cred.user;
-                        } catch (tokenErr) {
-                            const anonCred = await fbOps.signInAnonymously(auth);
-                            currentUser = anonCred.user;
-                        }
-                    } else {
-                        const cred = await fbOps.signInAnonymously(auth);
-                        currentUser = cred.user;
-                    }
-                }
-
-                isCloudReady = true;
-                await subscribeToSyncRoom(syncCode, false);
-            } catch (err) {
-                updateSyncIndicator('offline', '端末内保存（AirDrop/リンクで共有可能）');
-            }
-        }
-
-        function updateSyncIndicator(status, reasonText = '') {
-            const icon = document.getElementById('sync-status-icon');
-            const label = document.getElementById('sync-status-label');
-            const detail = document.getElementById('sync-connection-detail');
-            if (!icon || !label) return;
-
-            if (status === 'connected') {
-                icon.className = 'fa-solid fa-cloud text-xs text-emerald-300';
-                label.textContent = '同期中';
-                if (detail) {
-                    detail.className = 'text-[11px] text-emerald-600 font-bold';
-                    detail.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i>クラウドリアルタイム同期中`;
-                }
-            } else {
-                icon.className = 'fa-solid fa-share-nodes text-xs text-amber-300';
-                label.textContent = '端末間共有';
-                if (detail) {
-                    detail.className = 'text-[11px] text-slate-500 font-bold';
-                    detail.innerHTML = `<i class="fa-solid fa-mobile-screen mr-1"></i>${reasonText || '端末内保存モード'}`;
-                }
-            }
-        }
 
         // --- 同期URL生成＆AirDrop/OS標準シェア機能 ---
         function buildEncodedPayload() {
-            const payload = JSON.stringify({ syncCode, state });
+            const payload = JSON.stringify({ state });
             return 'COKEPASS:' + btoa(unescape(encodeURIComponent(payload)));
         }
 
@@ -850,7 +778,6 @@
                     if (err && err.name === 'AbortError') return;
                 }
             }
-            // Web Share非対応またはfile://の場合は引き継ぎテキスト/URLをコピー
             copySyncUrl();
         }
 
@@ -895,7 +822,6 @@
 
         function importBackupText() {
             let raw = (document.getElementById('restore-text-input').value || '').trim();
-            // URLごと貼り付けられた場合にも対応
             if (raw.includes('#data=')) {
                 raw = decodeURIComponent(raw.split('#data=')[1]);
             }
@@ -909,11 +835,6 @@
                 const parsed = JSON.parse(jsonStr);
                 if (parsed && parsed.state) {
                     applyParsedState(parsed.state);
-                    if (parsed.syncCode) {
-                        syncCode = parsed.syncCode;
-                        try { localStorage.setItem(SYNC_CODE_STORAGE_KEY, syncCode); } catch (e) {}
-                        document.getElementById('display-sync-code').textContent = syncCode;
-                    }
                     saveState();
                     renderQuickPresets();
                     updateUI();
@@ -927,95 +848,17 @@
             }
         }
 
-        // 指定の同期コードのドキュメントをリアルタイム監視
-        async function subscribeToSyncRoom(code, isJoiningExisting = false) {
-            if (!db || !currentUser || !fbOps) return;
-            if (unsubscribeSnapshot) {
-                unsubscribeSnapshot();
-                unsubscribeSnapshot = null;
-            }
-
-            syncCode = code.trim().toUpperCase();
-            try { localStorage.setItem(SYNC_CODE_STORAGE_KEY, syncCode); } catch (e) {}
-            const displayEl = document.getElementById('display-sync-code');
-            if (displayEl) displayEl.textContent = syncCode;
-
-            const roomDocRef = fbOps.doc(db, 'artifacts', appId, 'public', 'data', 'coke_pass_rooms', syncCode);
-
-            try {
-                const snap = await fbOps.getDoc(roomDocRef);
-                if (!snap.exists()) {
-                    await fbOps.setDoc(roomDocRef, {
-                        stateJson: JSON.stringify(state),
-                        updatedAt: Date.now()
-                    });
-                } else if (isJoiningExisting) {
-                    const data = snap.data();
-                    if (data && data.stateJson) {
-                        applyParsedState(JSON.parse(data.stateJson));
-                        saveLocalCacheOnly();
-                        renderQuickPresets();
-                        updateUI();
-                    }
-                }
-            } catch (e) {
-                console.error('Initial room check error:', e);
-            }
-
-            unsubscribeSnapshot = fbOps.onSnapshot(roomDocRef, (docSnap) => {
-                updateSyncIndicator('connected');
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    if (data && data.stateJson) {
-                        try {
-                            const remoteState = JSON.parse(data.stateJson);
-                            applyParsedState(remoteState);
-                            saveLocalCacheOnly();
-                            renderQuickPresets();
-                            updateUI();
-                        } catch (parseErr) {
-                            console.error('Remote state parse error:', parseErr);
-                        }
-                    }
-                }
-            }, (error) => {
-                console.error('Snapshot listener error:', error);
-                updateSyncIndicator('offline', 'クラウド接続エラー（ローカル保存で動作中）');
-            });
-        }
-
-        function saveLocalCacheOnly() {
-            try {
-                localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(state));
-            } catch (e) {}
-        }
-
-        // 状態保存（ローカルキャッシュ＋クラウド即時同期）
-        async function saveState() {
-            saveLocalCacheOnly();
-            if (isCloudReady && db && currentUser && syncCode && fbOps) {
-                try {
-                    const roomDocRef = fbOps.doc(db, 'artifacts', appId, 'public', 'data', 'coke_pass_rooms', syncCode);
-                    await fbOps.setDoc(roomDocRef, {
-                        stateJson: JSON.stringify(state),
-                        updatedAt: Date.now()
-                    });
-                } catch (e) {
-                    console.error('Failed to sync state to cloud:', e);
-                }
-            }
-        }
-
         // --- 同期モーダル操作 ---
         function openSyncModal() {
-            document.getElementById('display-sync-code').textContent = syncCode;
             const modal = document.getElementById('sync-modal');
+            if (!modal) return;
             modal.classList.remove('hidden');
             modal.classList.add('flex');
         }
 
         function closeSyncModal() {
             const modal = document.getElementById('sync-modal');
+            if (!modal) return;
             modal.classList.add('hidden');
             modal.classList.remove('flex');
         }
@@ -1998,9 +1841,6 @@
             closeSyncModal,
             shareSyncLink,
             copySyncUrl,
-            copySyncCode,
-            connectWithSyncCode,
-            generateNewSyncRoom,
             exportBackupText,
             toggleRestoreBox,
             importBackupText,
@@ -2029,6 +1869,12 @@
             closeConfirmModal,
             executeResetMonth
         });
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initApp);
+        } else {
+            initApp();
+        }
     </script>
 </body>
 </html>
