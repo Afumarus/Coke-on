@@ -122,12 +122,17 @@
                         <p id="current-plan-badge" class="text-xs text-white/85 font-medium mt-0.5">おトクプランMAX (月31本 / 日2本)</p>
                     </div>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="openSyncModal()" id="sync-status-btn"
+                       class="h-9 px-2.5 rounded-full bg-white/15 hover:bg-white/25 flex items-center gap-1.5 transition text-white text-xs font-bold" title="Mac・iPhone端末間同期">
+                        <i id="sync-status-icon" class="fa-solid fa-cloud text-xs text-emerald-300"></i>
+                        <span id="sync-status-label" class="hidden sm:inline">同期中</span>
+                    </button>
                     <a href="https://c.cocacola.co.jp/app/pass/" target="_blank" rel="noopener noreferrer" 
                        class="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition text-white" title="Coke ON Pass 公式サイト">
                         <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
                     </a>
-                    <button onclick="openSettingsModal()" class="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition text-white shadow-sm" title="プラン設定">
+                    <button type="button" onclick="openSettingsModal()" class="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition text-white shadow-sm" title="プラン設定">
                         <i class="fa-solid fa-sliders text-sm"></i>
                     </button>
                 </div>
@@ -290,21 +295,28 @@
 
         <!-- 3. カレンダー＆履歴切り替えタブ -->
         <section class="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
-            <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center justify-between mb-3 gap-2">
                 <div class="flex bg-slate-100 p-1 rounded-xl">
-                    <button id="tab-calendar" onclick="switchView('calendar')" class="px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition bg-white text-slate-800 shadow-sm">
+                    <button id="tab-calendar" onclick="switchView('calendar')" class="px-3 py-1.5 rounded-lg text-xs font-extrabold transition bg-white text-slate-800 shadow-sm">
                         <i class="fa-solid fa-calendar-check mr-1 text-coke-red"></i>カレンダー
                     </button>
-                    <button id="tab-history" onclick="switchView('history')" class="px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition text-slate-500 hover:text-slate-800">
-                        <i class="fa-solid fa-list-ul mr-1"></i>交換履歴 <span id="history-count-pill" class="ml-0.5 text-[10px] bg-slate-200 px-1.5 py-0.2 rounded-full">0</span>
+                    <button id="tab-history" onclick="switchView('history')" class="px-3 py-1.5 rounded-lg text-xs font-extrabold transition text-slate-500 hover:text-slate-800">
+                        <i class="fa-solid fa-list-ul mr-1"></i>履歴 <span id="history-count-pill" class="ml-0.5 text-[10px] bg-slate-200 px-1.5 py-0.2 rounded-full">0</span>
                     </button>
                 </div>
-                <span class="text-[11px] text-slate-400 font-medium" id="calendar-hint">日付タップで追加/編集</span>
+                <div id="calendar-controls" class="flex items-center gap-1.5">
+                    <button type="button" onclick="toggleCalendarMode()" id="btn-cal-mode" class="text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg transition">
+                        月間表示
+                    </button>
+                    <button type="button" onclick="toggleWeekStart()" id="btn-week-start" class="text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1.5 rounded-lg transition" title="週の始まりを切り替え">
+                        日曜始
+                    </button>
+                </div>
             </div>
 
             <!-- カレンダービュー -->
             <div id="view-calendar">
-                <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 mb-1.5">
+                <div id="calendar-weekdays" class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 mb-1.5">
                     <div class="text-red-400">日</div>
                     <div>月</div>
                     <div>火</div>
@@ -316,9 +328,12 @@
                 <div id="calendar-grid" class="grid grid-cols-7 gap-1.5">
                     <!-- JSで日付セルを生成 -->
                 </div>
-                <div class="flex items-center justify-end gap-3 mt-3 pt-2 border-t border-slate-50 text-[10px] text-slate-400 font-semibold">
-                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-red-100 border border-coke-red inline-block"></span>1本交換</span>
-                    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-coke-red inline-block"></span>上限達成</span>
+                <div class="flex items-center justify-between mt-3 pt-2 border-t border-slate-50 text-[10px] text-slate-400 font-semibold">
+                    <span>日付タップで追加/編集</span>
+                    <div class="flex items-center gap-3">
+                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-red-100 border border-coke-red inline-block"></span>1本交換</span>
+                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-coke-red inline-block"></span>上限達成</span>
+                    </div>
                 </div>
             </div>
 
@@ -553,9 +568,62 @@
         </div>
     </div>
 
-    <script>
-        // --- 状態管理とローカルストレージキー ---
-        const STORAGE_KEY = 'coke_on_pass_tracker_v1';
+    <!-- モーダル4: Mac・iPhone 端末間クラウド同期モーダル -->
+    <div id="sync-modal" onclick="if(event.target===this) closeSyncModal()" class="fixed inset-0 z-[105] bg-black/50 backdrop-blur-xs hidden items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-fadeIn">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="font-black text-base text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-cloud-arrow-up text-coke-red"></i>Mac・iPhone 端末間クラウド同期
+                </h3>
+                <button onclick="closeSyncModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2 text-center">
+                <span class="text-[11px] font-bold text-slate-500 block">現在の同期コード（この端末のID）</span>
+                <div class="flex items-center justify-center gap-2">
+                    <code id="display-sync-code" class="text-xl font-black tracking-widest text-coke-red bg-white px-4 py-2 rounded-xl border border-red-100 select-all">COKE-0000</code>
+                    <button type="button" onclick="copySyncCode()" class="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition flex items-center gap-1">
+                        <i class="fa-regular fa-copy"></i>コピー
+                    </button>
+                </div>
+                <p id="sync-connection-detail" class="text-[11px] text-emerald-600 font-bold pt-1">
+                    <i class="fa-solid fa-circle-check mr-1"></i>クラウドとリアルタイム接続中
+                </p>
+            </div>
+
+            <div class="space-y-2.5">
+                <label class="text-xs font-bold text-slate-700 block">別の端末（MacまたはiPhone）とデータを合わせる</label>
+                <p class="text-[11px] text-slate-500 leading-relaxed">
+                    もう一方の端末に表示されている「同期コード」を入力して接続すると、両方の端末で残り本数や交換履歴がリアルタイムに自動共有されます。
+                </p>
+                <div class="flex gap-2">
+                    <input type="text" id="input-sync-code" placeholder="例: COKE-1234" maxlength="20"
+                        class="flex-1 rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-black uppercase tracking-wider text-slate-800 focus:outline-none focus:border-coke-red">
+                    <button type="button" onclick="connectWithSyncCode()" class="bg-coke-red hover:bg-red-700 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap">
+                        コードで接続
+                    </button>
+                </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                <span>※個人情報は保存されません</span>
+                <button type="button" onclick="generateNewSyncRoom()" class="text-slate-500 hover:text-coke-red font-bold underline">
+                    新しいコードを発行
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- 状態管理とキー ---
+        const SYNC_CODE_STORAGE_KEY = 'coke_on_pass_sync_code_v1';
+        const CACHE_STORAGE_KEY = 'coke_on_pass_tracker_cache_v1';
 
         // クイック選択プリセット
         const QUICK_PRESETS = [
@@ -569,37 +637,71 @@
         // アプリの初期ステート
         let state = {
             plan: {
-                type: 'max',          // 'max' | 'plan20' | 'custom'
+                type: 'max',
                 name: 'おトクプランMAX',
-                monthlyLimit: 31,     // 月間最大本数
-                dailyLimit: 2,        // 1日あたり上限本数
-                price: 3300,          // 月額料金
+                monthlyLimit: 31,
+                dailyLimit: 2,
+                price: 3300,
                 defaultDrinkPrice: 180
             },
             selectedPresetIndex: 0,
-            // logsByMonth: { "YYYY-MM": [ { id, date: "YYYY-MM-DD", time: "HH:MM", name, price } ] }
             logsByMonth: {},
-            // offsetsByMonth: { "YYYY-MM": number } 月の途中開始時の初期消費済み本数補正
-            offsetsByMonth: {}
+            offsetsByMonth: {},
+            calendarPrefs: {
+                mode: 'month',      // 'month' | 'week'
+                weekStart: 'sun'    // 'sun' | 'mon'
+            }
         };
+
+        // Firebase 初期化変数
+        let db = null;
+        let auth = null;
+        let currentUser = null;
+        let syncCode = getOrCreateSyncCode();
+        let unsubscribeSnapshot = null;
+        let isCloudReady = false;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
         // 現在表示中の年月
         let now = new Date();
         let viewYear = now.getFullYear();
-        let viewMonth = now.getMonth() + 1; // 1-12
+        let viewMonth = now.getMonth() + 1;
         let lastCheckedDateStr = getTodayStr();
-        let currentTab = 'calendar'; // 'calendar' | 'history'
+        let currentTab = 'calendar';
+
+        // 同期コードの取得または新規生成
+        function getOrCreateSyncCode() {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const paramCode = urlParams.get('sync');
+                if (paramCode && paramCode.trim().length >= 4) {
+                    const normalized = paramCode.trim().toUpperCase();
+                    localStorage.setItem(SYNC_CODE_STORAGE_KEY, normalized);
+                    return normalized;
+                }
+                const saved = localStorage.getItem(SYNC_CODE_STORAGE_KEY);
+                if (saved && saved.trim().length >= 4) {
+                    return saved.trim().toUpperCase();
+                }
+            } catch (e) {}
+            const randomNum = Math.floor(1000 + Math.random() * 9000);
+            const newCode = `COKE-${randomNum}`;
+            try { localStorage.setItem(SYNC_CODE_STORAGE_KEY, newCode); } catch (e) {}
+            return newCode;
+        }
 
         // --- 初期化 ---
         let isInitialized = false;
-        function initApp() {
+        async function initApp() {
             if (isInitialized) return;
             isInitialized = true;
-            loadState();
+
+            loadLocalCache();
             createFizzBubbles();
             renderQuickPresets();
             updateUI();
             setupAutoMonthRollover();
+            await initCloudSync();
         }
 
         if (document.readyState === 'loading') {
@@ -609,359 +711,351 @@
         }
         window.addEventListener('load', initApp);
 
-        // ローカルストレージから読み込み
-                            logsByMonth: parsed.logsByMonth || {},
-                            offsetsByMonth: parsed.offsetsByMonth || {}
-                        };
+        // ローカルキャッシュから即座に初期読み込み
+        function loadLocalCache() {
+            try {
+                const raw = localStorage.getItem(CACHE_STORAGE_KEY) || localStorage.getItem('coke_on_pass_tracker_v1');
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && typeof parsed === 'object') {
+                        applyParsedState(parsed);
                     }
                 }
             } catch (e) {
-                console.error('Failed to load state:', e);
+                console.error('Failed to load cache:', e);
             }
         }
 
-        // クイックドリンクプリセット描画
-        function renderQuickPresets() {
-            const container = document.getElementById('quick-drink-presets');
-            if (!container) return;
-            container.innerHTML = '';
-
-            QUICK_PRESETS.forEach((preset, idx) => {
-                const isSelected = idx === state.selectedPresetIndex;
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.onclick = () => {
-                    state.selectedPresetIndex = idx;
-                    saveState();
-                    renderQuickPresets();
-                };
-                btn.className = isSelected
-                    ? 'flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-extrabold bg-slate-800 text-white shadow-xs transition flex items-center gap-1'
-                    : 'flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 transition flex items-center gap-1';
-                btn.innerHTML = `<span>${preset.icon}</span><span>${preset.label}</span><span class="opacity-75">¥${preset.price}</span>`;
-                container.appendChild(btn);
-            });
-
-            const activePreset = QUICK_PRESETS[state.selectedPresetIndex] || QUICK_PRESETS[0];
-            const badge = document.getElementById('selected-preset-badge');
-            if (badge) {
-                badge.textContent = `¥${activePreset.price}`;
-            }
-        }
-
-        // 日付・月またぎ自動検知（タブを開きっぱなしでも12月になったら自動切替）
-        function setupAutoMonthRollover() {
-            const checkRollover = () => {
-                const currentTodayStr = getTodayStr();
-                if (currentTodayStr !== lastCheckedDateStr) {
-                    const prevMonthKey = lastCheckedDateStr.slice(0, 7);
-                    const newMonthKey = currentTodayStr.slice(0, 7);
-                    lastCheckedDateStr = currentTodayStr;
-
-                    // 月が変わっていたら自動的に新しい月（12月など）へ切り替え
-                    if (prevMonthKey !== newMonthKey) {
-                        const d = new Date();
-                        viewYear = d.getFullYear();
-                        viewMonth = d.getMonth() + 1;
-                        showToast(`${viewYear}年${viewMonth}月になりました！残り本数がリセットされました🎉`, 'info');
-                    }
-                    updateUI();
+        function applyParsedState(parsed) {
+            state = {
+                ...state,
+                ...parsed,
+                plan: { ...state.plan, ...(parsed.plan || {}) },
+                logsByMonth: parsed.logsByMonth || {},
+                offsetsByMonth: parsed.offsetsByMonth || {},
+                calendarPrefs: {
+                    mode: (parsed.calendarPrefs && parsed.calendarPrefs.mode) || 'month',
+                    weekStart: (parsed.calendarPrefs && parsed.calendarPrefs.weekStart) || 'sun'
                 }
             };
-
-            // アプリ復帰時（バックグラウンドから戻った時）と1分ごとにチェック
-            document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible') checkRollover();
-            });
-            setInterval(checkRollover, 60000);
         }
 
-        // ローカルストレージへ保存
-        function saveState() {
+        // Firebase Cloud Firestore 接続＆リアルタイム購読
+        async function initCloudSync() {
+            updateSyncIndicator('connecting');
             try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-            } catch (e) {
-                console.error('Failed to save state:', e);
-            }
-        }
-
-        // YYYY-MM 形式のキー取得
-        function getMonthKey(year, month) {
-            return `${year}-${String(month).padStart(2, '0')}`;
-        }
-
-        // 今日の日付文字列 YYYY-MM-DD
-        function getTodayStr() {
-            const d = new Date();
-            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        }
-
-        // 表示中の月のログ配列を取得
-        function getCurrentMonthLogs() {
-            const key = getMonthKey(viewYear, viewMonth);
-            if (!state.logsByMonth[key]) {
-                state.logsByMonth[key] = [];
-            }
-            return state.logsByMonth[key];
-        }
-
-        // 表示中の月の初期消費済み補正本数を取得
-        function getCurrentMonthOffset() {
-            const key = getMonthKey(viewYear, viewMonth);
-            if (!state.offsetsByMonth) state.offsetsByMonth = {};
-            return Math.max(0, parseInt(state.offsetsByMonth[key], 10) || 0);
-        }
-
-        // 表示中の月の合計消費本数（アプリ内記録 + 途中開始補正分）
-        function getTotalUsedCount() {
-            return getCurrentMonthLogs().length + getCurrentMonthOffset();
-        }
-
-        // --- ワンタップ交換記録 ---
-        function recordQuickExchange() {
-            const logs = getCurrentMonthLogs();
-            const totalUsed = getTotalUsedCount();
-            const monthlyLimit = state.plan.monthlyLimit;
-            const dailyLimit = state.plan.dailyLimit;
-
-            if (totalUsed >= monthlyLimit) {
-                showToast('今月の交換上限に達しています！', 'warning');
-                return;
-            }
-
-            // 表示中の月が今月なら今日の日付、過去・未来月ならその月の1日または該当日
-            const todayStr = getTodayStr();
-            const currentMonthKey = getMonthKey(viewYear, viewMonth);
-            const targetDateStr = todayStr.startsWith(currentMonthKey) ? todayStr : `${currentMonthKey}-01`;
-
-            const todayLogs = logs.filter(l => l.date === targetDateStr);
-            if (todayLogs.length >= dailyLimit) {
-                showToast(`1日の上限（${dailyLimit}本）に達しています`, 'warning');
-                return;
-            }
-
-            const preset = QUICK_PRESETS[state.selectedPresetIndex] || QUICK_PRESETS[0];
-            const nowTime = new Date();
-            const timeStr = `${String(nowTime.getHours()).padStart(2, '0')}:${String(nowTime.getMinutes()).padStart(2, '0')}`;
-
-            logs.push({
-                id: 'log_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-                date: targetDateStr,
-                time: timeStr,
-                name: preset.label,
-                price: preset.price
-            });
-
-            saveState();
-            updateUI();
-
-            const remaining = Math.max(0, monthlyLimit - getTotalUsedCount());
-            showToast(`${preset.icon} 1本交換を記録！（今月残り${remaining}本）`, 'success');
-        }
-
-        // 直前の交換を1本取り消す
-        function undoLastExchange() {
-            const logs = getCurrentMonthLogs();
-            if (logs.length === 0) return;
-            const removed = logs.pop();
-            saveState();
-            updateUI();
-            showToast(`「${removed.name}」の記録を取り消しました`, 'info');
-        }
-
-        // --- UI全体更新 ---
-        function updateUI() {
-            const logs = getCurrentMonthLogs();
-            const initialOffset = getCurrentMonthOffset();
-            const { monthlyLimit, dailyLimit, price: planPrice, name: planName, defaultDrinkPrice } = state.plan;
-
-            // 1. ヘッダー＆プラン名表示
-            document.getElementById('current-plan-badge').textContent = `${planName} (月${monthlyLimit}本 / 日${dailyLimit}本)`;
-            document.getElementById('display-month').textContent = `${viewYear}年 ${viewMonth}月`;
-
-            const realNow = new Date();
-            const isCurrentMonth = (viewYear === realNow.getFullYear() && viewMonth === (realNow.getMonth() + 1));
-            const jumpBtn = document.getElementById(' jump-today-btn');
-            if (jumpBtn) {
-                jumpBtn.classList.toggle('hidden', isCurrentMonth);
-            }
-
-            // 2. 残り交換数と円形プログレス（アプリ記録＋途中開始補正を考慮）
-            const usedCount = logs.length + initialOffset;
-            const remainingCount = Math.max(0, monthlyLimit - usedCount);
-            document.getElementById('remaining-count').textContent = remainingCount;
-            document.getElementById('used-ratio-label').textContent = initialOffset > 0
-                ? `交換済: ${usedCount}/${monthlyLimit} (補正+${initialOffset})`
-                : `交換済: ${usedCount} / ${monthlyLimit}本`;
-            const ratio = monthlyLimit > 0 ? Math.min(1, remainingCount / monthlyLimit) : 0;
-            const circle = document.getElementById('progress-circle');
-            const radius = circle.r.baseVal.value;
-            const circumference = 2 * Math.PI * radius;
-            const offset = circumference - (ratio * circumference);
-            circle.style.strokeDasharray = `${circumference} ${circumference}`;
-            circle.style.strokeDashoffset = offset;
-
-            // 3. 今日の残り枠ステータス
-            const todayStr = getTodayStr();
-            const todayLogs = logs.filter(l => l.date === todayStr);
-            const todayUsed = todayLogs.length;
-            const todayRemaining = Math.max(0, Math.min(dailyLimit - todayUsed, remainingCount));
-
-            document.getElementById('today-remaining-num').textContent = todayRemaining;
-            document.getElementById('daily-limit-num').textContent = dailyLimit;
-
-            const bottleIconsContainer = document.getElementById('today-bottles-icons');
-            bottleIconsContainer.innerHTML = '';
-            for (let i = 0; i < dailyLimit; i++) {
-                const icon = document.createElement('i');
-                if (i < todayUsed) {
-                    // すでに交換済み
-                    icon.className = 'fa-solid fa-bottle-water text-slate-300 line-through';
-                    icon.title = '本日交換済み';
-                } else if (remainingCount > (i - todayUsed)) {
-                    // 交換可能
-                    icon.className = 'fa-solid fa-bottle-water text-coke-red animate-pulse';
-                    icon.title = '本日交換可能';
-                } else {
-                    icon.className = 'fa-solid fa-bottle-water text-slate-200';
+                if (typeof __firebase_config === 'undefined') {
+                    updateSyncIndicator('offline');
+                    return;
                 }
-                bottleIconsContainer.appendChild(icon);
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    const cred = await signInWithCustomToken(auth, __initial_auth_token);
+                    currentUser = cred.user;
+                } else {
+                    const cred = await signInAnonymously(auth);
+                    currentUser = cred.user;
+                }
+
+                isCloudReady = true;
+                subscribeToSyncRoom(syncCode, false);
+            } catch (err) {
+                console.error('Cloud sync init error:', err);
+                updateSyncIndicator('offline');
+            }
+        }
+
+        // 指定の同期コードのドキュメントをリアルタイム監視
+        async function subscribeToSyncRoom(code, isJoiningExisting = false) {
+            if (!db || !currentUser) return;
+            if (unsubscribeSnapshot) {
+                unsubscribeSnapshot();
+                unsubscribeSnapshot = null;
             }
 
-            const statusBadge = document.getElementById('today-status-badge');
-            const mainBtn = document.getElementById('main-exchange-btn');
-            const mainBtnText = document.getElementById('main-btn-text');
+            syncCode = code.trim().toUpperCase();
+            try { localStorage.setItem(SYNC_CODE_STORAGE_KEY, syncCode); } catch (e) {}
+            const displayEl = document.getElementById('display-sync-code');
+            if (displayEl) displayEl.textContent = syncCode;
 
-            if (remainingCount === 0) {
-                statusBadge.textContent = '今月上限達成🎉';
-                statusBadge.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700';
-                mainBtn.disabled = true;
-                mainBtnText.textContent = '今月の上限達成済み';
-            } else if (isCurrentMonth && todayRemaining === 0) {
-                statusBadge.textContent = '本日分完了';
-                statusBadge.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600';
-                mainBtn.disabled = true;
-                mainBtnText.textContent = '本日の交換上限達成';
-            } else {
-                statusBadge.textContent = '交換OK';
-                statusBadge.className = 'text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700';
-                mainBtn.disabled = false;
-                mainBtnText.textContent = '1本交換する';
-            }
+            const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'coke_pass_rooms', syncCode);
 
-            document.getElementById('undo-btn').disabled = (logs.length === 0);
-
-            // 4. 月末までの残り日数＆消化ペースアドバイス
-            const daysInMonth = new Date(viewYear, viewMonth, 0).getDate();
-            let daysLeft = daysInMonth;
-            if (isCurrentMonth) {
-                // 今日を含めた残り日数（今日まだ交換できるなら今日も含める）
-                daysLeft = daysInMonth - realNow.getDate() + (todayRemaining > 0 ? 1 : 0);
-            }
-
-            const daysLeftLabel = document.getElementById('days-left-label');
-            const paceAdvice = document.getElementById('pace-advice');
-
-            if (isCurrentMonth) {
-                daysLeftLabel.textContent = `今月あと ${daysLeft} 日`;
-                const maxPossibleRemaining = (daysInMonth - realNow.getDate()) * dailyLimit + todayRemaining;
-
-                if (remainingCount === 0) {
-                    paceAdvice.textContent = '今月のパス枠をすべて使い切りました！お見事です✨';
-                } else if (remainingCount > maxPossibleRemaining) {
-                    paceAdvice.textContent = `⚠️毎日${dailyLimit}本交換しても最大${maxPossibleRemaining}本までです。今日から毎日欠かさず交換しましょう！`;
-                } else if (daysLeft > 0) {
-                    const perDayNeeded = (remainingCount / daysLeft).toFixed(1);
-                    if (perDayNeeded >= 1.5) {
-                        paceAdvice.textContent = `1日平均 ${perDayNeeded}本ペース！1日2本交換する日を作ると使い切れます。`;
-                    } else if (perDayNeeded >= 0.9) {
-                        paceAdvice.textContent = `ほぼ毎日1本（平均${perDayNeeded}本/日）のペースでぴったり使い切れます！`;
-                    } else {
-                        paceAdvice.textContent = `余裕あり！平均 ${perDayNeeded}本/日 のペースで無理なく使い切れます。`;
+            try {
+                const snap = await getDoc(roomDocRef);
+                if (!snap.exists()) {
+                    // まだクラウドにデータがない場合は現在の端末データをアップロード
+                    await setDoc(roomDocRef, {
+                        stateJson: JSON.stringify(state),
+                        updatedAt: Date.now()
+                    });
+                } else if (isJoiningExisting) {
+                    // 別端末のコードに参加した場合はクラウド側の最新データを即座に反映
+                    const data = snap.data();
+                    if (data && data.stateJson) {
+                        applyParsedState(JSON.parse(data.stateJson));
+                        saveLocalCacheOnly();
+                        renderQuickPresets();
+                        updateUI();
                     }
                 }
-            } else {
-                daysLeftLabel.textContent = `${daysInMonth}日間`;
-                paceAdvice.textContent = `${viewYear}年${viewMonth}月の記録アーカイブ（全${usedCount}本交換）`;
+            } catch (e) {
+                console.error('Initial room check error:', e);
             }
 
-            // 5. おトク度・損益分岐トラッカー更新（途中開始補正分も基準価格で換算）
-            const loggedValue = logs.reduce((sum, item) => sum + (Number(item.price) || defaultDrinkPrice), 0);
-            const offsetValue = initialOffset * (defaultDrinkPrice || 180);
-            const totalValue = loggedValue + offsetValue;
-            const diff = totalValue - planPrice;
-            const roiPercent = planPrice > 0 ? Math.min(100, Math.round((totalValue / planPrice) * 100)) : 100;
+            unsubscribeSnapshot = onSnapshot(roomDocRef, (docSnap) => {
+                updateSyncIndicator('connected');
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if (data && data.stateJson) {
+                        try {
+                            const remoteState = JSON.parse(data.stateJson);
+                            applyParsedState(remoteState);
+                            saveLocalCacheOnly();
+                            renderQuickPresets();
+                            updateUI();
+                        } catch (parseErr) {
+                            console.error('Remote state parse error:', parseErr);
+                        }
+                    }
+                }
+            }, (error) => {
+                console.error('Snapshot listener error:', error);
+                updateSyncIndicator('offline');
+            });
+        }
 
-            document.getElementById('stat-plan-cost').textContent = `¥${planPrice.toLocaleString()}`;
-            document.getElementById('stat-total-value').textContent = `¥${totalValue.toLocaleString()}`;
+        function updateSyncIndicator(status) {
+            const icon = document.getElementById('sync-status-icon');
+            const label = document.getElementById('sync-status-label');
+            const detail = document.getElementById('sync-connection-detail');
+            if (!icon || !label) return;
 
-            const diffEl = document.getElementById('stat-diff-value');
-            const roiBadge = document.getElementById('roi-badge');
-            const breakevenText = document.getElementById('breakeven-text');
-
-            if (diff >= 0) {
-                diffEl.textContent = `+¥${diff.toLocaleString()}`;
-                diffEl.className = 'text-sm font-black text-emerald-600 mt-0.5';
-                roiBadge.textContent = `🎉 元取れ達成！ (+¥${diff.toLocaleString()})`;
-                roiBadge.className = 'text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700';
-                breakevenText.textContent = `月額料金の元を取って、さらに ¥${diff.toLocaleString()} おトクです！`;
+            if (status === 'connected') {
+                icon.className = 'fa-solid fa-cloud text-xs text-emerald-300';
+                label.textContent = syncCode;
+                if (detail) {
+                    detail.className = 'text-[11px] text-emerald-600 font-bold pt-1';
+                    detail.innerHTML = `<i class="fa-solid fa-circle-check mr-1"></i>クラウドとリアルタイム同期中 (${syncCode})`;
+                }
+            } else if (status === 'connecting') {
+                icon.className = 'fa-solid fa-rotate fa-spin text-xs text-amber-300';
+                label.textContent = '接続中';
+                if (detail) {
+                    detail.className = 'text-[11px] text-amber-600 font-bold pt-1';
+                    detail.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i>クラウドへ接続しています...`;
+                }
             } else {
-                const shortage = Math.abs(diff);
-                const bottlesNeeded = Math.ceil(shortage / (defaultDrinkPrice || 180));
-                diffEl.textContent = `-¥${shortage.toLocaleString()}`;
-                diffEl.className = 'text-sm font-black text-slate-500 mt-0.5';
-                roiBadge.textContent = `元取れまであと ${bottlesNeeded}本`;
-                roiBadge.className = 'text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700';
-                breakevenText.textContent = `あと ¥${shortage.toLocaleString()} 分（¥${defaultDrinkPrice}換算で約${bottlesNeeded}本）で元が取れます`;
+                icon.className = 'fa-solid fa-cloud-slash text-xs text-white/60';
+                label.textContent = 'ローカル';
+                if (detail) {
+                    detail.className = 'text-[11px] text-slate-500 font-bold pt-1';
+                    detail.innerHTML = `<i class="fa-solid fa-mobile-screen mr-1"></i>端末内保存モード`;
+                }
             }
+        }
 
-            document.getElementById('roi-percent').textContent = `${roiPercent}%`;
-            document.getElementById('roi-bar').style.width = `${roiPercent}%`;
+        function saveLocalCacheOnly() {
+            try {
+                localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(state));
+            } catch (e) {}
+        }
 
-            const currentUnitCost = usedCount > 0 ? Math.round(planPrice / usedCount) : '-';
-            const maxUnitCost = monthlyLimit > 0 ? Math.round(planPrice / monthlyLimit) : '-';
-            document.getElementById('cost-per-bottle').textContent = `現在の実質1本単価: ${currentUnitCost === '-' ? '-' : '¥' + currentUnitCost}`;
-            document.getElementById('max-cost-per-bottle').textContent = `上限(${monthlyLimit}本)消化時: 約¥${maxUnitCost}/本`;
-
-            // 6. 解約リマインダーカウントダウン
-            const renewalEl = document.getElementById('renewal-countdown');
-            if (isCurrentMonth) {
-                const daysUntilEndOfMonth = daysInMonth - realNow.getDate();
-                renewalEl.textContent = daysUntilEndOfMonth === 0 ? '⚠️本日14:59が解約期限！' : `月末更新まであと${daysUntilEndOfMonth}日`;
-            } else {
-                renewalEl.textContent = '月末14:59期限';
+        // 状態保存（ローカルキャッシュ＋クラウド即時同期）
+        async function saveState() {
+            saveLocalCacheOnly();
+            if (isCloudReady && db && currentUser && syncCode) {
+                try {
+                    const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'coke_pass_rooms', syncCode);
+                    await setDoc(roomDocRef, {
+                        stateJson: JSON.stringify(state),
+                        updatedAt: Date.now()
+                    });
+                } catch (e) {
+                    console.error('Failed to sync state to cloud:', e);
+                }
             }
+        }
 
+        // --- 同期モーダル操作 ---
+        function openSyncModal() {
+            document.getElementById('display-sync-code').textContent = syncCode;
+            document.getElementById('input-sync-code').value = '';
+            const modal = document.getElementById('sync-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeSyncModal() {
+            const modal = document.getElementById('sync-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function copySyncCode() {
+            const tempInput = document.createElement('input');
+            tempInput.value = syncCode;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            showToast(`同期コード「${syncCode}」をコピーしました！`, 'success');
+        }
+
+        async function connectWithSyncCode() {
+            const rawInput = document.getElementById('input-sync-code').value.trim().toUpperCase();
+            if (rawInput.length < 4) {
+                showToast('4文字以上の同期コードを入力してください', 'warning');
+                return;
+            }
+            if (!isCloudReady) {
+                showToast('現在クラウド同期に接続できません', 'warning');
+                return;
+            }
+            await subscribeToSyncRoom(rawInput, true);
+            closeSyncModal();
+            showToast(`同期コード「${rawInput}」に接続しました！`, 'success');
+        }
+
+        async function generateNewSyncRoom() {
+            const randomNum = Math.floor(1000 + Math.random() * 9000);
+            const newCode = `COKE-${randomNum}`;
+            await subscribeToSyncRoom(newCode, false);
+            showToast(`新しい同期コード「${newCode}」を発行しました`, 'info');
+        }
+
+        // --- カレンダー表示切替（月間⇔週間 / 日曜始⇔月曜始） ---
+        function toggleCalendarMode() {
+            if (!state.calendarPrefs) state.calendarPrefs = { mode: 'month', weekStart: 'sun' };
+            state.calendarPrefs.mode = state.calendarPrefs.mode === 'month' ? 'week' : 'month';
+            saveState();
+            updateUI();
+        }
+
+        function toggleWeekStart() {
+            if (!state.calendarPrefs) state.calendarPrefs = { mode: 'month', weekStart: 'sun' };
+            state.calendarPrefs.weekStart = state.calendarPrefs.weekStart === 'sun' ? 'mon' : 'sun';
+            saveState();
+            updateUI();
+        }
             // 7. カレンダーと履歴の描画
             document.getElementById('history-count-pill').textContent = usedCount;
             renderCalendar(logs);
             renderHistoryList(logs);
         }
 
-        // --- カレンダーグリッド描画 ---
+        // --- カレンダーグリッド描画（月間/週間・日曜始/月曜始対応） ---
         function renderCalendar(logs) {
             const grid = document.getElementById('calendar-grid');
+            const weekdaysHeader = document.getElementById('calendar-weekdays');
+            const btnMode = document.getElementById('btn-cal-mode');
+            const btnWeekStart = document.getElementById('btn-week-start');
             grid.innerHTML = '';
 
-            const firstDayOfWeek = new Date(viewYear, viewMonth - 1, 1).getDay(); // 0(Sun) - 6(Sat)
+            const mode = (state.calendarPrefs && state.calendarPrefs.mode) || 'month';
+            const weekStart = (state.calendarPrefs && state.calendarPrefs.weekStart) || 'sun';
+
+            if (btnMode) btnMode.textContent = mode === 'month' ? '月間表示' : '週間表示';
+            if (btnWeekStart) btnWeekStart.textContent = weekStart === 'sun' ? '日曜始' : '月曜始';
+
+            // 曜日ヘッダー描画
+            if (weekdaysHeader) {
+                const daysLabels = weekStart === 'sun'
+                    ? [
+                        { text: '日', cls: 'text-red-400' }, { text: '月', cls: '' }, { text: '火', cls: '' },
+                        { text: '水', cls: '' }, { text: '木', cls: '' }, { text: '金', cls: '' },
+                        { text: '土', cls: 'text-blue-400' }
+                      ]
+                    : [
+                        { text: '月', cls: '' }, { text: '火', cls: '' }, { text: '水', cls: '' },
+                        { text: '木', cls: '' }, { text: '金', cls: '' },
+                        { text: '土', cls: 'text-blue-400' }, { text: '日', cls: 'text-red-400' }
+                      ];
+                weekdaysHeader.innerHTML = daysLabels.map(d => `<div class="${d.cls}">${d.text}</div>`).join('');
+            }
+
             const daysInMonth = new Date(viewYear, viewMonth, 0).getDate();
             const todayStr = getTodayStr();
             const dailyLimit = state.plan.dailyLimit;
 
-            // 日付ごとの本数集計マップ
+            // 日付ごとの本数・金額集計マップ
             const countByDate = {};
+            const priceByDate = {};
             logs.forEach(l => {
                 countByDate[l.date] = (countByDate[l.date] || 0) + 1;
+                priceByDate[l.date] = (priceByDate[l.date] || 0) + (Number(l.price) || 180);
             });
 
-            // 空白セル
-            for (let i = 0; i < firstDayOfWeek; i++) {
+            if (mode === 'week') {
+                // 週間ビュー（表示月の今日を含む週、または第1週を表示）
+                const realNow = new Date();
+                const isCurrentMonth = (viewYear === realNow.getFullYear() && viewMonth === (realNow.getMonth() + 1));
+                const anchorDay = isCurrentMonth ? realNow.getDate() : 1;
+                const anchorDate = new Date(viewYear, viewMonth - 1, anchorDay);
+                const dayOfWeek = anchorDate.getDay(); // 0(Sun)-6(Sat)
+                const diffToStart = weekStart === 'sun' ? dayOfWeek : (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
+
+                const startDate = new Date(viewYear, viewMonth - 1, anchorDay - diffToStart);
+
+                for (let i = 0; i < 7; i++) {
+                    const cellDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i);
+                    const cYear = cellDate.getFullYear();
+                    const cMonth = cellDate.getMonth() + 1;
+                    const cDay = cellDate.getDate();
+                    const dateStr = `${cYear}-${String(cMonth).padStart(2, '0')}-${String(cDay).padStart(2, '0')}`;
+
+                    // 別月のログも含めて参照
+                    const monthLogsForCell = state.logsByMonth[getMonthKey(cYear, cMonth)] || [];
+                    const dayLogs = monthLogsForCell.filter(l => l.date === dateStr);
+                    const count = dayLogs.length;
+                    const dayTotal = dayLogs.reduce((s, l) => s + (Number(l.price) || 180), 0);
+                    const isToday = (dateStr === todayStr);
+                    const isOtherMonth = (cMonth !== viewMonth);
+
+                    const cell = document.createElement('button');
+                    cell.type = 'button';
+                    cell.onclick = () => openCustomDrinkModal(dateStr);
+
+                    let bgClass = isOtherMonth
+                        ? 'bg-slate-50/40 text-slate-400 border-transparent'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-transparent';
+                    if (count >= dailyLimit) {
+                        bgClass = 'bg-coke-red text-white font-bold shadow-xs border-coke-red';
+                    } else if (count > 0) {
+                        bgClass = 'bg-red-50 text-coke-red font-bold border-red-300';
+                    }
+
+                    const todayRing = isToday ? 'ring-2 ring-slate-800 ring-offset-1' : '';
+                    cell.className = `h-20 rounded-xl border transition flex flex-col items-center justify-between py-2 px-0.5 relative ${bgClass} ${todayRing}`;
+
+                    cell.innerHTML = `
+                        <span class="text-[11px] font-extrabold leading-none">${isOtherMonth ? `${cMonth}/` : ''}${cDay}</span>
+                        <div class="flex flex-col items-center gap-0.5">
+                            ${count > 0
+                                ? `<span class="text-[10px] font-black px-1.5 py-0.5 rounded ${count >= dailyLimit ? 'bg-black/20 text-white' : 'bg-coke-red/15 text-coke-red'}">${count}本</span>
+                                   <span class="text-[9px] opacity-85 font-bold">¥${dayTotal}</span>`
+                                : `<span class="text-[9px] opacity-40">-</span>`
+                            }
+                        </div>
+                    `;
+                    grid.appendChild(cell);
+                }
+                return;
+            }
+
+            // 月間ビュー
+            const rawFirstDay = new Date(viewYear, viewMonth - 1, 1).getDay(); // 0(Sun) - 6(Sat)
+            const leadingBlanks = weekStart === 'sun' ? rawFirstDay : (rawFirstDay === 0 ? 6 : rawFirstDay - 1);
+
+            for (let i = 0; i < leadingBlanks; i++) {
                 const empty = document.createElement('div');
-                empty.className = 'h-11 rounded-xl bg-transparent';
+                empty.className = 'h-12 rounded-xl bg-transparent';
                 grid.appendChild(empty);
             }
 
-            // 日付セル
             for (let day = 1; day <= daysInMonth; day++) {
                 const dateStr = `${viewYear}-${String(viewMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 const count = countByDate[dateStr] || 0;
@@ -982,13 +1076,11 @@
 
                 cell.className = `h-12 rounded-xl border transition flex flex-col items-center justify-center relative ${bgClass} ${todayRing}`;
 
-                // 日付数字
                 const dayNum = document.createElement('span');
                 dayNum.className = 'text-xs leading-none';
                 dayNum.textContent = day;
                 cell.appendChild(dayNum);
 
-                // ドリンク本数インジケーター
                 const dots = document.createElement('div');
                 dots.className = 'flex items-center gap-0.5 mt-1 h-3';
                 if (count > 0) {
@@ -1005,146 +1097,6 @@
                 cell.appendChild(dots);
 
                 grid.appendChild(cell);
-            }
-        }
-
-        // --- 交換履歴リスト描画 ---
-        function renderHistoryList(logs) {
-            const container = document.getElementById('history-list');
-            container.innerHTML = '';
-
-            if (logs.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center py-8 text-slate-400">
-                        <i class="fa-solid fa-bottle-water text-2xl mb-2 opacity-40"></i>
-                        <p class="text-xs font-bold">この月の交換記録はまだありません</p>
-                        <p class="text-[11px] mt-0.5">上の「1本交換する」ボタンからワンタップで記録できます</p>
-                    </div>
-                `;
-                return;
-            }
-
-            // 新しい順にソートして表示
-            const sorted = [...logs].sort((a, b) => {
-                if (a.date !== b.date) return b.date.localeCompare(a.date);
-                return (b.time || '').localeCompare(a.time || '');
-            });
-
-            sorted.forEach(item => {
-                const row = document.createElement('div');
-                row.className = 'flex items-center justify-between bg-slate-50 hover:bg-slate-100/80 px-3.5 py-2.5 rounded-2xl border border-slate-100 transition';
-                row.innerHTML = `
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-xl bg-red-100 text-coke-red flex items-center justify-center text-sm font-bold">
-                            <i class="fa-solid fa-bottle-water"></i>
-                        </div>
-                        <div>
-                            <p class="text-xs font-extrabold text-slate-800">${escapeHtml(item.name || 'ドリンク交換')}</p>
-                            <p class="text-[10px] text-slate-400 font-semibold">${item.date} ${item.time || ''}</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-2.5">
-                        <span class="text-xs font-black text-slate-700">¥${Number(item.price || 180).toLocaleString()}</span>
-                        <button onclick="deleteLogById('${item.id}')" class="w-7 h-7 rounded-lg hover:bg-red-100 text-slate-400 hover:text-coke-red flex items-center justify-center transition" title="削除">
-                            <i class="fa-regular fa-trash-can text-xs"></i>
-                        </button>
-                    </div>
-                `;
-                container.appendChild(row);
-            });
-        }
-
-        // 特定のログIDを削除
-        function deleteLogById(id) {
-            const key = getMonthKey(viewYear, viewMonth);
-            if (!state.logsByMonth[key]) return;
-            state.logsByMonth[key] = state.logsByMonth[key].filter(l => l.id !== id);
-            saveState();
-            updateUI();
-            renderModalDayLogs();
-            showToast('記録を1件削除しました', 'info');
-        }
-
-        // --- カレンダー・履歴タブ切り替え ---
-        function switchView(tab) {
-            currentTab = tab;
-            const calView = document.getElementById('view-calendar');
-            const histView = document.getElementById('view-history');
-            const tabCal = document.getElementById('tab-calendar');
-            const tabHist = document.getElementById('tab-history');
-            const hint = document.getElementById('calendar-hint');
-
-            if (tab === 'calendar') {
-                calView.classList.remove('hidden');
-                histView.classList.add('hidden');
-                tabCal.className = 'px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition bg-white text-slate-800 shadow-sm';
-                tabHist.className = 'px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition text-slate-500 hover:text-slate-800';
-                hint.textContent = '日付タップで追加/編集';
-            } else {
-                calView.classList.add('hidden');
-                histView.classList.remove('hidden');
-                tabHist.className = 'px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition bg-white text-slate-800 shadow-sm';
-                tabCal.className = 'px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition text-slate-500 hover:text-slate-800';
-                hint.textContent = 'ゴミ箱アイコンで個別削除';
-            }
-        }
-
-        // --- 月の移動 ---
-        function changeMonth(delta) {
-            viewMonth += delta;
-            if (viewMonth > 12) {
-                viewMonth = 1;
-                viewYear++;
-            } else if (viewMonth < 1) {
-                viewMonth = 12;
-                viewYear--;
-            }
-            updateUI();
-        }
-
-        function jumpToCurrentMonth() {
-            const d = new Date();
-            viewYear = d.getFullYear();
-            viewMonth = d.getMonth() + 1;
-            updateUI();
-        }
-
-        // --- 設定モーダル制御 ---
-        function openSettingsModal(focusAdjustment = false) {
-            const monthlyLimit = state.plan.monthlyLimit;
-            const logsCount = getCurrentMonthLogs().length;
-            const currentOffset = getCurrentMonthOffset();
-            const currentRemaining = Math.max(0, monthlyLimit - (logsCount + currentOffset));
-
-            document.getElementById('input-monthly-limit').value = monthlyLimit;
-            document.getElementById('input-daily-limit').value = state.plan.dailyLimit;
-            document.getElementById('input-plan-price').value = state.plan.price;
-            document.getElementById('input-default-drink-price').value = state.plan.defaultDrinkPrice || 180;
-
-            // 途中開始補正フィールドの初期化
-            document.getElementById('adjust-month-badge').textContent = `${viewYear}年${viewMonth}月分`;
-            document.getElementById('input-initial-offset').value = currentOffset;
-            document.getElementById('input-current-remaining').value = currentRemaining;
-            document.getElementById('offset-helper-text').textContent =
-                `※「現在の残り交換数」にCoke ONアプリの数字を入れると自動逆算されます（アプリ内記録: ${logsCount}本）`;
-
-            // 日割り開始日の初期値（表示中の月の今日、または1日）
-            const todayStr = getTodayStr();
-            const currentMonthKey = getMonthKey(viewYear, viewMonth);
-            document.getElementById('input-prorate-start-date').value =
-                todayStr.startsWith(currentMonthKey) ? todayStr : `${currentMonthKey}-01`;
-
-            highlightPlanPresetButton(state.plan.type);
-
-            const modal = document.getElementById('settings-modal');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-
-            if (focusAdjustment) {
-                setTimeout(() => {
-                    const box = document.getElementById('midmonth-adjustment-box');
-                    if (box) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 100);
             }
         }
 
@@ -1457,6 +1409,39 @@
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
         }
+
+        // HTMLのonclick属性から呼び出せるようにグローバルへ公開
+        Object.assign(window, {
+            openSyncModal,
+            closeSyncModal,
+            copySyncCode,
+            connectWithSyncCode,
+            generateNewSyncRoom,
+            openSettingsModal,
+            closeSettingsModal,
+            selectPlanPreset,
+            syncRemainingPreview,
+            onOffsetInput,
+            onRemainingInput,
+            applyProratedCalculation,
+            saveSettings,
+            openCustomDrinkModal,
+            closeCustomDrinkModal,
+            fillCustomDrink,
+            addCustomExchange,
+            renderModalDayLogs,
+            deleteLogById,
+            recordQuickExchange,
+            undoLastExchange,
+            switchView,
+            toggleCalendarMode,
+            toggleWeekStart,
+            changeMonth,
+            jumpToCurrentMonth,
+            confirmResetMonth,
+            closeConfirmModal,
+            executeResetMonth
+        });
     </script>
 </body>
 </html>
