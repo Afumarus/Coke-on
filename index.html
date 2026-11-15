@@ -576,9 +576,10 @@
         };
 
         // 現在表示中の年月
-        const now = new Date();
+        let now = new Date();
         let viewYear = now.getFullYear();
         let viewMonth = now.getMonth() + 1; // 1-12
+        let lastCheckedDateStr = getTodayStr();
         let currentTab = 'calendar'; // 'calendar' | 'history'
 
         // --- 初期化 ---
@@ -587,16 +588,35 @@
             createFizzBubbles();
             renderQuickPresets();
             updateUI();
+            setupAutoMonthRollover();
         };
 
-        // ローカルストレージから読み込み
-        function loadState() {
-            try {
-                const saved = localStorage.getItem(STORAGE_KEY);
-                if (saved) {
-                    const parsed = JSON.parse(saved);
-                    state = { ...state, ...parsed, plan: { ...state.plan, ...(parsed.plan || {}) } };
+        // 日付・月またぎ自動検知（タブを開きっぱなしでも12月になったら自動切替）
+        function setupAutoMonthRollover() {
+            const checkRollover = () => {
+                const currentTodayStr = getTodayStr();
+                if (currentTodayStr !== lastCheckedDateStr) {
+                    const prevMonthKey = lastCheckedDateStr.slice(0, 7);
+                    const newMonthKey = currentTodayStr.slice(0, 7);
+                    lastCheckedDateStr = currentTodayStr;
+
+                    // 月が変わっていたら自動的に新しい月（12月など）へ切り替え
+                    if (prevMonthKey !== newMonthKey) {
+                        const d = new Date();
+                        viewYear = d.getFullYear();
+                        viewMonth = d.getMonth() + 1;
+                        showToast(`${viewYear}年${viewMonth}月になりました！残り本数がリセットされました🎉`, 'info');
+                    }
+                    updateUI();
                 }
+            };
+
+            // アプリ復帰時（バックグラウンドから戻った時）と1分ごとにチェック
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') checkRollover();
+            });
+            setInterval(checkRollover, 60000);
+        }
             } catch (e) {
                 console.error('Failed to load state:', e);
             }
