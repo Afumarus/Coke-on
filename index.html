@@ -163,7 +163,7 @@
                             <span class="text-xs font-bold text-slate-500">本</span>
                         </div>
                         <span id="used-ratio-label" class="text-[10px] font-semibold text-slate-400 mt-0.5">交換済: 0 / 31</span>
-                        <button onclick="openSettingsModal(true)" class="mt-1 text-[10px] font-bold text-coke-red bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded-full transition flex items-center gap-0.5">
+                        <button type="button" onclick="openSettingsModal(true)" class="mt-1 text-[10px] font-bold text-coke-red bg-red-50 hover:bg-red-100 active:bg-red-200 px-2.5 py-1 rounded-full transition flex items-center gap-0.5 cursor-pointer relative z-10">
                             <i class="fa-solid fa-sliders text-[9px]"></i>途中開始・補正
                         </button>
                     </div>
@@ -591,6 +591,56 @@
             setupAutoMonthRollover();
         };
 
+        // ローカルストレージから読み込み（欠損していた関数を完全復元）
+        function loadState() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && typeof parsed === 'object') {
+                        state = {
+                            ...state,
+                            ...parsed,
+                            plan: { ...state.plan, ...(parsed.plan || {}) },
+                            logsByMonth: parsed.logsByMonth || {},
+                            offsetsByMonth: parsed.offsetsByMonth || {}
+                        };
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to load state:', e);
+            }
+        }
+
+        // クイックドリンクプリセット描画
+        function renderQuickPresets() {
+            const container = document.getElementById('quick-drink-presets');
+            if (!container) return;
+            container.innerHTML = '';
+
+            QUICK_PRESETS.forEach((preset, idx) => {
+                const isSelected = idx === state.selectedPresetIndex;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.onclick = () => {
+                    state.selectedPresetIndex = idx;
+                    saveState();
+                    renderQuickPresets();
+                };
+                btn.className = isSelected
+                    ? 'flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-extrabold bg-slate-800 text-white shadow-xs transition flex items-center gap-1'
+                    : 'flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 transition flex items-center gap-1';
+                btn.innerHTML = `<span>${preset.icon}</span><span>${preset.label}</span><span class="opacity-75">¥${preset.price}</span>`;
+                container.appendChild(btn);
+            });
+
+            const activePreset = QUICK_PRESETS[state.selectedPresetIndex] || QUICK_PRESETS[0];
+            const badge = document.getElementById('selected-preset-badge');
+            if (badge) {
+                badge.textContent = `¥${activePreset.price}`;
+            }
+        }
+
         // 日付・月またぎ自動検知（タブを開きっぱなしでも12月になったら自動切替）
         function setupAutoMonthRollover() {
             const checkRollover = () => {
@@ -616,10 +666,6 @@
                 if (document.visibilityState === 'visible') checkRollover();
             });
             setInterval(checkRollover, 60000);
-        }
-            } catch (e) {
-                console.error('Failed to load state:', e);
-            }
         }
 
         // ローカルストレージへ保存
